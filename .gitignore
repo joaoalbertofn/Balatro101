@@ -1,0 +1,31 @@
+# C# / .NET / Visual Studio / VS Code gitignore
+[Oo]bj/
+[Bb]in/
+.vs/
+.vscode/
+
+# Build results
+[Dd]ebug/
+[Jj]ust[Ii]n[Tt]ime/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]uild/
+bak/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# User-specific files (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# macOS
+.DS_Store
+
+# Log files
+*.log
