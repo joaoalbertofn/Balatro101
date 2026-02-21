@@ -9,6 +9,8 @@ public static class AudioEngine
     private static Sound blipSound;
     private static Sound scoreSound;
     private static Sound shuffleSound;
+    private static Sound coinSound;
+    private static Sound slideSound;
 
     private static Random rng = new Random();
 
@@ -19,6 +21,8 @@ public static class AudioEngine
         blipSound = GenerateBlip();
         scoreSound = GenerateScoreSino();
         shuffleSound = GenerateShuffle();
+        coinSound = GenerateCoin();
+        slideSound = GenerateSlide();
     }
 
     public static void Close()
@@ -28,6 +32,8 @@ public static class AudioEngine
             Raylib.UnloadSound(blipSound);
             Raylib.UnloadSound(scoreSound);
             Raylib.UnloadSound(shuffleSound);
+            Raylib.UnloadSound(coinSound);
+            Raylib.UnloadSound(slideSound);
             Raylib.CloseAudioDevice();
         }
     }
@@ -53,10 +59,44 @@ public static class AudioEngine
         Raylib.PlaySound(shuffleSound);
     }
 
+    public static void PlayCoin()
+    {
+        if (!Raylib.IsAudioDeviceReady()) return;
+        Raylib.SetSoundPitch(coinSound, 1.0f + (float)(rng.NextDouble() * 0.1));
+        Raylib.PlaySound(coinSound);
+    }
+
+    public static void PlaySlide()
+    {
+        if (!Raylib.IsAudioDeviceReady()) return;
+        Raylib.SetSoundPitch(slideSound, 1.0f + (float)(rng.NextDouble() * 0.2 - 0.1));
+        Raylib.PlaySound(slideSound);
+    }
+
+    private static Sound GenerateSlide()
+    {
+        int sampleRate = 44100;
+        int durationMs = 60;
+        int samples = (sampleRate * durationMs) / 1000;
+        short[] data = new short[samples];
+
+        for (int i = 0; i < samples; i++)
+        {
+            float envelope = 1.0f - ((float)i / samples);
+            envelope = (float)Math.Pow(envelope, 2);
+
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            data[i] = (short)(noise * 6000 * envelope);
+        }
+
+        return CreateSoundFromShorts(data, sampleRate);
+    }
+
     private static Sound GenerateBlip()
     {
         int sampleRate = 44100;
-        int durationMs = 80;
+        int durationMs = 120;
         int samples = (sampleRate * durationMs) / 1000;
         short[] data = new short[samples];
 
@@ -94,19 +134,52 @@ public static class AudioEngine
     private static Sound GenerateShuffle()
     {
         int sampleRate = 44100;
-        int durationMs = 150;
+        int durationMs = 250;
+        int samples = (sampleRate * durationMs) / 1000;
+        short[] data = new short[samples];
+
+        float lastNoise = 0;
+        for (int i = 0; i < samples; i++)
+        {
+            float progress = (float)i / samples;
+            float envelope;
+
+            // Multiple envelope peaks to simulate multiple cards falling
+            float pulse = (float)Math.Abs(Math.Sin(progress * Math.PI * 6));
+            envelope = 1.0f - progress;
+            envelope *= pulse;
+
+            float rawNoise = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            // Simple low-pass filter (smoothing) to make paper "thicker"
+            float filteredNoise = (rawNoise + lastNoise) * 0.5f;
+            lastNoise = filteredNoise;
+
+            data[i] = (short)(filteredNoise * 14000 * envelope);
+        }
+
+        return CreateSoundFromShorts(data, sampleRate);
+    }
+
+    private static Sound GenerateCoin()
+    {
+        int sampleRate = 44100;
+        int durationMs = 300;
         int samples = (sampleRate * durationMs) / 1000;
         short[] data = new short[samples];
 
         for (int i = 0; i < samples; i++)
         {
-            float progress = (float)i / samples;
-            float envelope;
-            if (progress < 0.2f) envelope = progress / 0.2f;
-            else envelope = 1.0f - ((progress - 0.2f) / 0.8f);
+            float t = (float)i / sampleRate;
+            float freq1 = 2000f; // High metallic pitch
+            float freq2 = 2800f; // Dissonant metallic harmonic
 
-            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-            data[i] = (short)(noise * 12000 * envelope);
+            float envelope = 1.0f - ((float)i / samples);
+            envelope = (float)Math.Pow(envelope, 6); // Extremely sharp ping
+
+            float mix = (float)Math.Sin(2 * Math.PI * freq1 * t) + ((float)Math.Sin(2 * Math.PI * freq2 * t) * 0.5f);
+
+            data[i] = (short)(mix * 8000 * envelope);
         }
 
         return CreateSoundFromShorts(data, sampleRate);

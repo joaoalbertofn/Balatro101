@@ -81,6 +81,10 @@ public static class GameUI
             var rect = new Rectangle(card.X, card.Y, RendererUtils.CardWidth * card.Scale, RendererUtils.CardHeight * card.Scale);
             if (hoveredIndex == -1 && Raylib.CheckCollisionPointRec(mousePos, rect))
             {
+                if (!card.IsHovered)
+                {
+                    AudioEngine.PlaySlide();
+                }
                 card.IsHovered = true;
                 hoveredIndex = i;
                 if (Raylib.IsMouseButtonPressed(MouseButton.Left))
@@ -120,7 +124,7 @@ public static class GameUI
                 card.TargetRotation = 0f;
             }
 
-            TweenEngine.UpdateCardPhysics(card, dt);
+            TweenEngine.UpdatePhysics(card, dt);
         }
     }
 
@@ -189,35 +193,31 @@ public static class GameUI
         Raylib.DrawText($"MAOS: {game.HandsLeft}", 50, 200, 30, Color.Blue);
         Raylib.DrawText($"DESCARTES: {game.DiscardsLeft}", 50, 240, 30, Color.Orange);
 
-        // Jokers
-        int startX = 400;
+        // Jokers (Center top)
+        int totalJokersWidth = game.SelectedJokers.Count * 120;
+        int startX = (GameConfig.WindowWidth - totalJokersWidth) / 2 - 50;
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
-            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 140, 50);
+            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 120, 50, false, 0.8f);
         }
 
         // Consumables in top right
-        int startConsumableX = GameConfig.WindowWidth - 300;
+        int startConsumableX = GameConfig.WindowWidth - 280;
         for (int i = 0; i < game.Consumables.Count; i++)
         {
             var item = game.Consumables[i];
-            float ix = startConsumableX + i * 120;
-            float iy = 150;
+            float ix = startConsumableX + i * 130;
+            float iy = 60; // Placed higher to match Joker height
 
-            // Draw scale down consumable
-            Rlgl.PushMatrix();
-            Rlgl.Translatef(ix, iy, 0); // Translate to center
-            Rlgl.Scalef(0.4f, 0.4f, 1f);
-
-            var rectC = new Rectangle(-75, -120, 150, 240); // Draw from local center
-            Raylib.DrawRectangleRounded(rectC, 0.1f, 10, item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple);
-            Raylib.DrawRectangleLinesEx(rectC, 3f, Color.Black);
-            Raylib.DrawText(item.Type.ToString().ToUpper(), -65, -110, 15, Color.White);
-            Raylib.DrawText(item.Name, -65, -80, 20, Color.Yellow);
-            Rlgl.PopMatrix();
+            // Calculate mouse collision manually for hover
+            var rect = new Rectangle(ix, iy, 150 * 0.8f, 240 * 0.8f);
+            bool isHovered = Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), rect);
+            
+            // Draw unified scalable consumable
+            RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.8f);
 
             // Use button below consumable
-            if (RendererUtils.DrawButton("USE", ix - 30, iy + 60, 60, 25))
+            if (RendererUtils.DrawButton("USE", ix + 10, iy + 210, 100, 30))
             {
                 // Play sound
                 AudioEngine.PlayScore();

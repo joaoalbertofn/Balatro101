@@ -25,30 +25,30 @@ public static class TweenEngine
     /// <summary>
     /// Updates all physics properties of a card.
     /// </summary>
-    public static void UpdateCardPhysics(Card card, float dt)
+    public static void UpdatePhysics(AnimatableItem item, float dt)
     {
-        float x = card.X;
-        float vx = card.VelocityX;
-        ApplySpring(ref x, ref vx, card.TargetX, dt);
-        card.X = x;
-        card.VelocityX = vx;
+        float x = item.X;
+        float vx = item.VelocityX;
+        ApplySpring(ref x, ref vx, item.TargetX, dt);
+        item.X = x;
+        item.VelocityX = vx;
 
-        float y = card.Y;
-        float vy = card.VelocityY;
-        ApplySpring(ref y, ref vy, card.TargetY, dt);
-        card.Y = y;
-        card.VelocityY = vy;
+        float y = item.Y;
+        float vy = item.VelocityY;
+        ApplySpring(ref y, ref vy, item.TargetY, dt);
+        item.Y = y;
+        item.VelocityY = vy;
 
-        float rot = card.Rotation;
-        float vrot = card.VelocityRotation;
-        ApplySpring(ref rot, ref vrot, card.TargetRotation, dt);
-        card.Rotation = rot;
-        card.VelocityRotation = vrot;
+        float rot = item.Rotation;
+        float vrot = item.VelocityRotation;
+        ApplySpring(ref rot, ref vrot, item.TargetRotation, dt);
+        item.Rotation = rot;
+        item.VelocityRotation = vrot;
 
-        float scale = card.Scale;
-        float vscale = card.VelocityScale;
-        ApplySpring(ref scale, ref vscale, card.TargetScale, dt);
-        card.Scale = scale;
-        card.VelocityScale = vscale;
+        float scale = item.Scale;
+        float vscale = item.VelocityScale;
+        ApplySpring(ref scale, ref vscale, item.TargetScale, dt);
+        item.Scale = scale;
+        item.VelocityScale = vscale;
     }
 }

@@ -2,7 +2,7 @@ using System.Linq;
 
 namespace Balatro101.Game.Core;
 
-public record PairJoker() : IJoker
+public class PairJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker de Pares";
     public string Description => "+4 Mult se jogar um Par";
@@ -15,7 +15,7 @@ public record PairJoker() : IJoker
     public void OnCardScored(Card card, ScoreState scoreState) { }
 }
 
-public record HeartsJoker() : IJoker
+public class HeartsJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker de Copas";
     public string Description => "+10 Fichas por Copas";
@@ -27,7 +27,7 @@ public record HeartsJoker() : IJoker
     }
 }
 
-public record FixedJoker() : IJoker
+public class FixedJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Fixo";
     public string Description => "+50 Fichas bases";
@@ -39,7 +39,7 @@ public record FixedJoker() : IJoker
     public void OnCardScored(Card card, ScoreState scoreState) { }
 }
 
-public record FlushMultiplierJoker() : IJoker
+public class FlushMultiplierJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Multiplicador";
     public string Description => "x2 Mult no Flush";
@@ -52,7 +52,7 @@ public record FlushMultiplierJoker() : IJoker
     public void OnCardScored(Card card, ScoreState scoreState) { }
 }
 
-public record SpadesJoker() : IJoker
+public class SpadesJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker de Espadas";
     public string Description => "+10 Fichas por Espadas";
@@ -64,7 +64,7 @@ public record SpadesJoker() : IJoker
     }
 }
 
-public record HighCardJoker() : IJoker
+public class HighCardJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Alto";
     public string Description => "+1 Mult por carta 10+";
@@ -76,7 +76,7 @@ public record HighCardJoker() : IJoker
     }
 }
 
-public record CrazyJoker() : IJoker
+public class CrazyJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Louco";
     public string Description => "+15 Mult por Trinca";
@@ -89,7 +89,7 @@ public record CrazyJoker() : IJoker
     public void OnCardScored(Card card, ScoreState scoreState) { }
 }
 
-public record LuckyJoker() : IJoker
+public class LuckyJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker da Sorte";
     public string Description => "+20 Fichas por Carta Alta";
@@ -102,7 +102,7 @@ public record LuckyJoker() : IJoker
     public void OnCardScored(Card card, ScoreState scoreState) { }
 }
 
-public record RedJoker() : IJoker
+public class RedJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Vermelho";
     public string Description => "+2 Mult se Copas/Ouros";
@@ -114,7 +114,7 @@ public record RedJoker() : IJoker
     }
 }
 
-public record SupremeJoker() : IJoker
+public class SupremeJoker() : AnimatableItem, IJoker
 {
     public string Name => "Joker Supremo";
     public string Description => "x3 Mult no Straight";

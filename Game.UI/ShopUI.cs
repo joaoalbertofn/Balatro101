@@ -60,13 +60,15 @@ public static class ShopUI
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
             var joker = game.SelectedJokers[i];
-            float jx = 50 + i * 140;
+            float jx = 50 + i * 110;
             float jy = 105;
-            RendererUtils.DrawJoker(joker, jx, jy);
+            // Draw joker in smaller scale for inventory
+            RendererUtils.DrawJoker(joker, jx, jy, false, 0.7f);
 
             // Sell Button below inventory item
-            if (!actionTaken && RendererUtils.DrawButton("SELL $2", jx, jy + 170, 120, 30))
+            if (!actionTaken && RendererUtils.DrawButton("SELL $2", jx, jy + 160, 90, 30))
             {
+                AudioEngine.PlayCoin();
                 game.Money += 2;
                 game.SelectedJokers.RemoveAt(i);
                 actionTaken = true;
@@ -75,28 +77,20 @@ public static class ShopUI
         }
 
         // 1.b Draw Inventory Consumables
-        Raylib.DrawText($"CONSUMABLES ({game.Consumables.Count}/{GameConfig.MaxConsumables})", 800, 75, 20, Color.LightGray);
+        Raylib.DrawText($"CONSUMABLES ({game.Consumables.Count}/{GameConfig.MaxConsumables})", 700, 75, 20, Color.LightGray);
         for (int i = 0; i < game.Consumables.Count; i++)
         {
             var item = game.Consumables[i];
-            float ix = 800 + i * 160;
-            float iy = 210;
+            float ix = 700 + i * 120;
+            float iy = 105;
 
             // Draw scale down consumable
-            Rlgl.PushMatrix();
-            Rlgl.Translatef(ix, iy, 0); // Translate to center
-            Rlgl.Scalef(0.6f, 0.6f, 1f);
-
-            var rectC = new Rectangle(-75, -120, 150, 240); // Draw from local center
-            Raylib.DrawRectangleRounded(rectC, 0.1f, 10, item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple);
-            Raylib.DrawRectangleLinesEx(rectC, 3f, Color.Black);
-            Raylib.DrawText(item.Type.ToString().ToUpper(), -65, -110, 15, Color.White);
-            Raylib.DrawText(item.Name, -65, -80, 20, Color.Yellow);
-            Rlgl.PopMatrix();
+            RendererUtils.DrawConsumable(item, ix, iy, false, 0.65f);
 
             // Sell Button below inventory item
-            if (!actionTaken && RendererUtils.DrawButton("SELL $1", ix - 35, iy + 90, 70, 30))
+            if (!actionTaken && RendererUtils.DrawButton("SELL $1", ix, iy + 165, 90, 30))
             {
+                AudioEngine.PlayCoin();
                 game.Money += 1;
                 game.Consumables.RemoveAt(i);
                 actionTaken = true;
@@ -105,24 +99,27 @@ public static class ShopUI
         }
 
         // 2. Draw Shop Offerings (Bottom)
-        Raylib.DrawText("FOR SALE", 50, 350, 20, Color.LightGray);
+        Raylib.DrawText("FOR SALE", 50, 320, 20, Color.LightGray);
         int startX = 50;
-        int y = 380;
+        int y = 350;
 
         // Draw Consumables
         for (int i = 0; i < shopConsumables.Count; i++)
         {
             var item = shopConsumables[i];
-            float itemX = startX + i * 200;
+            float itemX = startX + i * 220; // More spacing for larger scale
+
+            // Determine hover zone for normal 1.0f sized consumable
             var rect = new Rectangle(itemX, y, 150, 240);
             bool isHovered = Raylib.CheckCollisionPointRec(mousePos, rect);
 
-            DrawConsumable(item, itemX, y, isHovered);
+            RendererUtils.DrawConsumable(item, itemX, y, isHovered, 1.0f);
 
             if (!actionTaken && RendererUtils.DrawButton($"BUY ${item.Cost}", itemX, y + 260, 150, 40))
             {
                 if (game.Money >= item.Cost && game.Consumables.Count < GameConfig.MaxConsumables)
                 {
+                    AudioEngine.PlayCoin();
                     game.Money -= item.Cost;
                     game.Consumables.Add(item);
                     shopConsumables.RemoveAt(i);
@@ -146,6 +143,7 @@ public static class ShopUI
             {
                 if (game.Money >= cost && game.SelectedJokers.Count < 5)
                 {
+                    AudioEngine.PlayCoin();
                     game.Money -= cost;
                     game.SelectedJokers.Add(joker);
                     shopJokers.RemoveAt(i);
@@ -161,52 +159,5 @@ public static class ShopUI
             shopInitialized = false;
             game.StartBlind();
         }
-    }
-
-    private static void DrawConsumable(IConsumable item, float x, float y, bool isHovered)
-    {
-        float scale = isHovered ? 1.05f : 1.0f;
-
-        Rlgl.PushMatrix();
-        Rlgl.Translatef(x + 75, y + 120, 0); // Translate to center
-        Rlgl.Scalef(scale, scale, 1f);
-
-        var rect = new Rectangle(-75, -120, 150, 240); // Draw from local center
-
-        // Shadow
-        Raylib.DrawRectangleRounded(new Rectangle(-75 + 10, -120 + 10, 150, 240), 0.1f, 10, new Color(0, 0, 0, 100));
-
-        Color bgColor = item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple;
-
-        Raylib.DrawRectangleRounded(rect, 0.1f, 10, bgColor);
-        Raylib.DrawRectangleLinesEx(rect, 3f, Color.Black);
-
-        Raylib.DrawText(item.Type.ToString().ToUpper(), -65, -110, 15, Color.White);
-        Raylib.DrawText(item.Name, -65, -80, 20, Color.Yellow);
-
-        // Word wrap description
-        string[] words = item.Description.Split(' ');
-        int lineY = -15;
-        string currentLine = "";
-
-        foreach (var word in words)
-        {
-            if (currentLine.Length + word.Length < 16)
-            {
-                currentLine += word + " ";
-            }
-            else
-            {
-                Raylib.DrawText(currentLine, -65, lineY, 15, Color.White);
-                currentLine = word + " ";
-                lineY += 20;
-            }
-        }
-        if (currentLine.Length > 0)
-        {
-            Raylib.DrawText(currentLine, -65, lineY, 15, Color.White);
-        }
-
-        Rlgl.PopMatrix();
     }
 }

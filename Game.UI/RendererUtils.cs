@@ -117,32 +117,63 @@ public static class RendererUtils
         Raylib.DrawRectangle(cx - size / 4, cy, size / 2, size, color);
     }
 
-    public static void DrawJoker(IJoker joker, float x, float y, bool isSelected = false)
+    public static void DrawJoker(IJoker joker, float x, float y, bool isSelected = false, float scale = 1.0f)
     {
-        var rect = new Rectangle(x, y, 120, 160);
-        Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.LightGray);
+        float width = 140 * scale;
+        float height = 210 * scale;
+        var rect = new Rectangle(x, y, width, height);
 
+        // Drop shadow
+        Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
+
+        // Card Base
+        Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.LightGray);
         Color borderColor = isSelected ? Color.Green : Color.Black;
         Raylib.DrawRectangleLinesEx(rect, isSelected ? 4f : 2f, borderColor);
 
-        Raylib.DrawText(joker.Name, (int)x + 5, (int)y + 8, 12, Color.Black);
-        Raylib.DrawText("JOKER", (int)x + 30, (int)y + 60, 20, Color.DarkBlue);
+        // Name
+        int titleFontSize = (int)(16 * scale);
+        // Center name
+        int nameW = Raylib.MeasureText(joker.Name, titleFontSize);
+        Raylib.DrawText(joker.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 15 * scale), titleFontSize, Color.Black);
 
+        // Logo
+        int logoFontSize = (int)(26 * scale);
+        int logoW = Raylib.MeasureText("JOKER", logoFontSize);
+        Raylib.DrawText("JOKER", (int)(x + width / 2 - logoW / 2), (int)(y + 70 * scale), logoFontSize, Color.DarkBlue);
+
+        // Description word wrap (smarter)
         string[] words = joker.Description.Split(' ');
-        string line1 = "";
-        string line2 = "";
-        string line3 = "";
-        foreach (var w in words)
+        float currentY = y + 130 * scale;
+        string currentLine = "";
+        int descFontSize = (int)(13 * scale);
+        int maxLineWidth = (int)(width - 20 * scale); // 10 padding each side
+
+        foreach (var word in words)
         {
-            if (line1.Length + w.Length < 16) line1 += w + " ";
-            else if (line2.Length + w.Length < 16) line2 += w + " ";
-            else line3 += w + " ";
+            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+            int testWidth = Raylib.MeasureText(testLine, descFontSize);
+
+            if (testWidth < maxLineWidth)
+            {
+                currentLine = testLine;
+            }
+            else
+            {
+                // Draw current line and move to next
+                int lineW = Raylib.MeasureText(currentLine, descFontSize);
+                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+
+                currentLine = word;
+                currentY += 16 * scale;
+            }
         }
-        Raylib.DrawText(line1.Trim(), (int)x + 5, (int)y + 100, 10, Color.DarkGray);
-        if (line2.Length > 0)
-            Raylib.DrawText(line2.Trim(), (int)x + 5, (int)y + 115, 10, Color.DarkGray);
-        if (line3.Length > 0)
-            Raylib.DrawText(line3.Trim(), (int)x + 5, (int)y + 130, 10, Color.DarkGray);
+        // Draw remainder
+        if (currentLine.Length > 0)
+        {
+            int lineW = Raylib.MeasureText(currentLine, descFontSize);
+            Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+        }
     }
 
     public static bool DrawButton(string text, float x, float y, float width, float height)
@@ -164,5 +195,62 @@ public static class RendererUtils
         }
 
         return false;
+    }
+
+    public static void DrawConsumable(IConsumable item, float x, float y, bool isHovered, float scale = 1.0f)
+    {
+        float animScale = isHovered ? scale * 1.05f : scale;
+        float width = 150 * animScale;
+        float height = 240 * animScale;
+
+        // Shadow
+        Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 100));
+
+        var rect = new Rectangle(x, y, width, height);
+        Color bgColor = item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple;
+
+        Raylib.DrawRectangleRounded(rect, 0.1f, 10, bgColor);
+        Raylib.DrawRectangleLinesEx(rect, 3f, Color.Black);
+
+        // Header Title
+        int typeFontSize = (int)(15 * animScale);
+        string typeStr = item.Type.ToString().ToUpper();
+        int typeW = Raylib.MeasureText(typeStr, typeFontSize);
+        Raylib.DrawText(typeStr, (int)(x + width / 2 - typeW / 2), (int)(y + 10 * animScale), typeFontSize, Color.White);
+
+        // Name
+        int nameFontSize = (int)(22 * animScale);
+        int nameW = Raylib.MeasureText(item.Name, nameFontSize);
+        Raylib.DrawText(item.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 40 * animScale), nameFontSize, Color.Yellow);
+
+        // Word wrap description
+        string[] words = item.Description.Split(' ');
+        float currentY = y + 100 * animScale;
+        string currentLine = "";
+        int descFontSize = (int)(15 * animScale);
+        int maxLineWidth = (int)(width - 20 * animScale);
+
+        foreach (var word in words)
+        {
+            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+            int testWidth = Raylib.MeasureText(testLine, descFontSize);
+
+            if (testWidth < maxLineWidth)
+            {
+                currentLine = testLine;
+            }
+            else
+            {
+                int lineW = Raylib.MeasureText(currentLine, descFontSize);
+                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
+                currentLine = word;
+                currentY += 20 * animScale;
+            }
+        }
+        if (currentLine.Length > 0)
+        {
+            int lineW = Raylib.MeasureText(currentLine, descFontSize);
+            Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
+        }
     }
 }

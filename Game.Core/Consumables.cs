@@ -28,7 +28,7 @@ public interface IPlanet : IConsumable
 }
 
 // Basic Implementations
-public record TheFool : ITarot
+public class TheFool : AnimatableItem, ITarot
 {
     public string Name => "The Fool";
     public string Description => "Enhances card to give +10 Chips.";
@@ -42,7 +42,7 @@ public record TheFool : ITarot
     }
 }
 
-public record Mercury : IPlanet
+public class Mercury : AnimatableItem, IPlanet
 {
     public string Name => "Mercury";
     public string Description => "Level up Pair (+15 Chips, +1 Mult)";
