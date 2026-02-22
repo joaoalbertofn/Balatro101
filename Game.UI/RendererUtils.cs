@@ -33,53 +33,85 @@ public static class RendererUtils
         float localX = -CardWidth / 2f;
         float localY = -CardHeight / 2f;
 
-        var rect = new Rectangle(localX, localY, CardWidth, CardHeight);
-        Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.White);
-
-        Color borderColor = card.IsSelected ? Color.Blue : Color.Black;
-        float thickness = card.IsSelected ? 4f : 2f;
-        Raylib.DrawRectangleLinesEx(rect, thickness, borderColor);
-
-        Color textColor = card.Suit switch
-        {
-            Suit.Hearts => Color.Red,
-            Suit.Diamonds => Color.Blue,
-            Suit.Clubs => new Color(0, 150, 0, 255), // Dark Green
-            Suit.Spades => Color.Black,
-            _ => Color.Black
-        };
-
         string rankStr = card.Rank switch
         {
             Rank.Jack => "J",
             Rank.Queen => "Q",
             Rank.King => "K",
             Rank.Ace => "A",
-            _ => ((int)card.Rank).ToString()
+            _ => ((int)card.Rank).ToString("00")
         };
+        string suitStr = card.Suit.ToString().ToLower();
+        string texKey = $"card_{suitStr}_{rankStr}";
 
-        Raylib.DrawText(rankStr, (int)localX + 10, (int)localY + 10, 20, textColor);
-        int w = Raylib.MeasureText(rankStr, 40);
-        Raylib.DrawText(rankStr, (int)localX + (CardWidth - w) / 2, (int)localY + 50, 40, textColor);
+        var tex = AssetManager.GetTexture(texKey);
 
-        switch (card.Suit)
+        Color borderColor = card.IsSelected ? Color.Blue : Color.Black;
+        float thickness = card.IsSelected ? 4f : (tex.HasValue ? 0f : 2f);
+
+        if (tex.HasValue)
         {
-            case Suit.Hearts:
-                DrawHeart((int)localX + 10, (int)localY + 35, 10, textColor);
-                DrawHeart((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
-                break;
-            case Suit.Diamonds:
-                DrawDiamond((int)localX + 10, (int)localY + 35, 10, textColor);
-                DrawDiamond((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
-                break;
-            case Suit.Clubs:
-                DrawClub((int)localX + 10, (int)localY + 35, 10, textColor);
-                DrawClub((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
-                break;
-            case Suit.Spades:
-                DrawSpade((int)localX + 10, (int)localY + 35, 10, textColor);
-                DrawSpade((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
-                break;
+            var sourceRec = new Rectangle(0, 0, tex.Value.Width, tex.Value.Height);
+            float targetWidth = CardWidth;
+            float targetHeight = targetWidth * ((float)tex.Value.Height / tex.Value.Width);
+            float yOffset = (CardHeight - targetHeight) / 2f;
+            var destRec = new Rectangle(localX, localY + yOffset, targetWidth, targetHeight);
+
+            Raylib.DrawTexturePro(tex.Value, sourceRec, destRec, Vector2.Zero, 0f, Color.White);
+
+            if (thickness > 0)
+            {
+                Raylib.DrawRectangleLinesEx(destRec, thickness, borderColor);
+            }
+        }
+        else
+        {
+            var rect = new Rectangle(localX, localY, CardWidth, CardHeight);
+            Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.White);
+
+            Raylib.DrawRectangleLinesEx(rect, thickness, borderColor);
+
+            Color textColor = card.Suit switch
+            {
+                Suit.Hearts => Color.Red,
+                Suit.Diamonds => Color.Blue,
+                Suit.Clubs => new Color(0, 150, 0, 255), // Dark Green
+                Suit.Spades => Color.Black,
+                _ => Color.Black
+            };
+
+            string procRankStr = card.Rank switch
+            {
+                Rank.Jack => "J",
+                Rank.Queen => "Q",
+                Rank.King => "K",
+                Rank.Ace => "A",
+                _ => ((int)card.Rank).ToString()
+            };
+
+            Raylib.DrawText(procRankStr, (int)localX + 10, (int)localY + 10, 20, textColor);
+            int w = Raylib.MeasureText(procRankStr, 40);
+            Raylib.DrawText(procRankStr, (int)localX + (CardWidth - w) / 2, (int)localY + 50, 40, textColor);
+
+            switch (card.Suit)
+            {
+                case Suit.Hearts:
+                    DrawHeart((int)localX + 10, (int)localY + 35, 10, textColor);
+                    DrawHeart((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
+                    break;
+                case Suit.Diamonds:
+                    DrawDiamond((int)localX + 10, (int)localY + 35, 10, textColor);
+                    DrawDiamond((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
+                    break;
+                case Suit.Clubs:
+                    DrawClub((int)localX + 10, (int)localY + 35, 10, textColor);
+                    DrawClub((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
+                    break;
+                case Suit.Spades:
+                    DrawSpade((int)localX + 10, (int)localY + 35, 10, textColor);
+                    DrawSpade((int)localX + CardWidth / 2, (int)localY + 110, 20, textColor);
+                    break;
+            }
         }
 
         Rlgl.PopMatrix();
@@ -126,63 +158,87 @@ public static class RendererUtils
         // Drop shadow
         Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
 
-        // Card Base
-        Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.LightGray);
-        Color borderColor = isSelected ? Color.Green : Color.Black;
-        Raylib.DrawRectangleLinesEx(rect, isSelected ? 4f : 2f, borderColor);
+        var tex = AssetManager.GetTexture(joker.TextureKey);
 
-        // Name
-        int titleFontSize = (int)(16 * scale);
-        // Center name
-        int nameW = Raylib.MeasureText(joker.Name, titleFontSize);
-        Raylib.DrawText(joker.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 15 * scale), titleFontSize, Color.Black);
-
-        // Logo
-        int logoFontSize = (int)(26 * scale);
-        int logoW = Raylib.MeasureText("JOKER", logoFontSize);
-        Raylib.DrawText("JOKER", (int)(x + width / 2 - logoW / 2), (int)(y + 70 * scale), logoFontSize, Color.DarkBlue);
-
-        // Description word wrap (smarter)
-        string[] words = joker.Description.Split(' ');
-        float currentY = y + 130 * scale;
-        string currentLine = "";
-        int descFontSize = (int)(13 * scale);
-        int maxLineWidth = (int)(width - 20 * scale); // 10 padding each side
-
-        foreach (var word in words)
+        if (tex.HasValue)
         {
-            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
-            int testWidth = Raylib.MeasureText(testLine, descFontSize);
+            var sourceRec = new Rectangle(0, 0, tex.Value.Width, tex.Value.Height);
+            float targetWidth = width;
+            float targetHeight = targetWidth * ((float)tex.Value.Height / tex.Value.Width);
+            var destRec = new Rectangle(x, y, targetWidth, targetHeight);
 
-            if (testWidth < maxLineWidth)
-            {
-                currentLine = testLine;
-            }
-            else
-            {
-                // Draw current line and move to next
-                int lineW = Raylib.MeasureText(currentLine, descFontSize);
-                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+            Raylib.DrawTexturePro(tex.Value, sourceRec, destRec, Vector2.Zero, 0f, Color.White);
 
-                currentLine = word;
-                currentY += 16 * scale;
+            if (isSelected)
+            {
+                Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Green);
             }
         }
-        // Draw remainder
-        if (currentLine.Length > 0)
+        else
         {
-            int lineW = Raylib.MeasureText(currentLine, descFontSize);
-            Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+            // Card Base
+            Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.LightGray);
+            Color borderColor = isSelected ? Color.Green : Color.Black;
+            Raylib.DrawRectangleLinesEx(rect, isSelected ? 4f : 2f, borderColor);
+
+            // Name
+            int titleFontSize = (int)(16 * scale);
+            // Center name
+            int nameW = Raylib.MeasureText(joker.Name, titleFontSize);
+            Raylib.DrawText(joker.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 15 * scale), titleFontSize, Color.Black);
+
+            // Logo
+            int logoFontSize = (int)(26 * scale);
+            int logoW = Raylib.MeasureText("JOKER", logoFontSize);
+            Raylib.DrawText("JOKER", (int)(x + width / 2 - logoW / 2), (int)(y + 70 * scale), logoFontSize, Color.DarkBlue);
+
+            // Description word wrap (smarter)
+            string[] words = joker.Description.Split(' ');
+            float currentY = y + 130 * scale;
+            string currentLine = "";
+            int descFontSize = (int)(13 * scale);
+            int maxLineWidth = (int)(width - 20 * scale); // 10 padding each side
+
+            foreach (var word in words)
+            {
+                string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+                int testWidth = Raylib.MeasureText(testLine, descFontSize);
+
+                if (testWidth < maxLineWidth)
+                {
+                    currentLine = testLine;
+                }
+                else
+                {
+                    // Draw current line and move to next
+                    int lineW = Raylib.MeasureText(currentLine, descFontSize);
+                    Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+
+                    currentLine = word;
+                    currentY += 16 * scale;
+                }
+            }
+            // Draw remainder
+            if (currentLine.Length > 0)
+            {
+                int lineW = Raylib.MeasureText(currentLine, descFontSize);
+                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+            }
         }
     }
 
     public static bool DrawButton(string text, float x, float y, float width, float height)
     {
+        return DrawButton(text, x, y, width, height, Color.Gray, Color.DarkGray);
+    }
+
+    public static bool DrawButton(string text, float x, float y, float width, float height, Color baseColor, Color hoverColor)
+    {
         Vector2 mousePos = Raylib.GetMousePosition();
         Rectangle rect = new Rectangle(x, y, width, height);
         bool isHovered = Raylib.CheckCollisionPointRec(mousePos, rect);
 
-        Raylib.DrawRectangleRec(rect, isHovered ? Color.DarkGray : Color.Gray);
+        Raylib.DrawRectangleRec(rect, isHovered ? hoverColor : baseColor);
         Raylib.DrawRectangleLinesEx(rect, 2, Color.Black);
 
         int textW = Raylib.MeasureText(text, 20);
@@ -190,7 +246,6 @@ public static class RendererUtils
 
         if (isHovered && Raylib.IsMouseButtonPressed(MouseButton.Left))
         {
-            Balatro101.Game.Engine.AudioEngine.PlayBlip();
             return true;
         }
 
@@ -207,50 +262,69 @@ public static class RendererUtils
         Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 100));
 
         var rect = new Rectangle(x, y, width, height);
-        Color bgColor = item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple;
+        var tex = AssetManager.GetTexture(item.TextureKey);
 
-        Raylib.DrawRectangleRounded(rect, 0.1f, 10, bgColor);
-        Raylib.DrawRectangleLinesEx(rect, 3f, Color.Black);
-
-        // Header Title
-        int typeFontSize = (int)(15 * animScale);
-        string typeStr = item.Type.ToString().ToUpper();
-        int typeW = Raylib.MeasureText(typeStr, typeFontSize);
-        Raylib.DrawText(typeStr, (int)(x + width / 2 - typeW / 2), (int)(y + 10 * animScale), typeFontSize, Color.White);
-
-        // Name
-        int nameFontSize = (int)(22 * animScale);
-        int nameW = Raylib.MeasureText(item.Name, nameFontSize);
-        Raylib.DrawText(item.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 40 * animScale), nameFontSize, Color.Yellow);
-
-        // Word wrap description
-        string[] words = item.Description.Split(' ');
-        float currentY = y + 100 * animScale;
-        string currentLine = "";
-        int descFontSize = (int)(15 * animScale);
-        int maxLineWidth = (int)(width - 20 * animScale);
-
-        foreach (var word in words)
+        if (tex.HasValue)
         {
-            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
-            int testWidth = Raylib.MeasureText(testLine, descFontSize);
+            var sourceRec = new Rectangle(0, 0, tex.Value.Width, tex.Value.Height);
+            float targetWidth = width;
+            float targetHeight = targetWidth * ((float)tex.Value.Height / tex.Value.Width);
+            var destRec = new Rectangle(x, y, targetWidth, targetHeight);
 
-            if (testWidth < maxLineWidth)
+            Raylib.DrawTexturePro(tex.Value, sourceRec, destRec, Vector2.Zero, 0f, Color.White);
+
+            if (isHovered)
             {
-                currentLine = testLine;
+                Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Yellow);
             }
-            else
+        }
+        else
+        {
+            Color bgColor = item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple;
+
+            Raylib.DrawRectangleRounded(rect, 0.1f, 10, bgColor);
+            Raylib.DrawRectangleLinesEx(rect, 3f, Color.Black);
+
+            // Header Title
+            int typeFontSize = (int)(15 * animScale);
+            string typeStr = item.Type.ToString().ToUpper();
+            int typeW = Raylib.MeasureText(typeStr, typeFontSize);
+            Raylib.DrawText(typeStr, (int)(x + width / 2 - typeW / 2), (int)(y + 10 * animScale), typeFontSize, Color.White);
+
+            // Name
+            int nameFontSize = (int)(22 * animScale);
+            int nameW = Raylib.MeasureText(item.Name, nameFontSize);
+            Raylib.DrawText(item.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 40 * animScale), nameFontSize, Color.Yellow);
+
+            // Word wrap description
+            string[] words = item.Description.Split(' ');
+            float currentY = y + 100 * animScale;
+            string currentLine = "";
+            int descFontSize = (int)(15 * animScale);
+            int maxLineWidth = (int)(width - 20 * animScale);
+
+            foreach (var word in words)
+            {
+                string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+                int testWidth = Raylib.MeasureText(testLine, descFontSize);
+
+                if (testWidth < maxLineWidth)
+                {
+                    currentLine = testLine;
+                }
+                else
+                {
+                    int lineW = Raylib.MeasureText(currentLine, descFontSize);
+                    Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
+                    currentLine = word;
+                    currentY += 20 * animScale;
+                }
+            }
+            if (currentLine.Length > 0)
             {
                 int lineW = Raylib.MeasureText(currentLine, descFontSize);
                 Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
-                currentLine = word;
-                currentY += 20 * animScale;
             }
-        }
-        if (currentLine.Length > 0)
-        {
-            int lineW = Raylib.MeasureText(currentLine, descFontSize);
-            Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
         }
     }
 }

@@ -44,7 +44,7 @@ public static class GameUI
 
     private static void DrawMainMenu(GameManager game)
     {
-        Raylib.DrawText("BALATRO CLONE", GameConfig.WindowWidth / 2 - 250, 200, 60, Color.White);
+        Raylib.DrawText("BALATRO do J.A.", GameConfig.WindowWidth / 2 - 250, 200, 60, Color.White);
         if (RendererUtils.DrawButton("INICIAR", GameConfig.WindowWidth / 2 - 100, 400, 200, 50))
         {
             game.StartGame();
@@ -59,16 +59,15 @@ public static class GameUI
         int numCards = game.PlayerHand.Count;
         float spacing = 110f;
         float totalWidth = numCards * spacing;
-        float startX = (GameConfig.WindowWidth - totalWidth) / 2;
-        float baseY = 500f;
+        float startX = 280 + (GameConfig.WindowWidth - 280 - totalWidth) / 2; // Fixed spacing using 280 for left panel
+        float baseY = GameConfig.WindowHeight - 250f;
         float dt = Raylib.GetFrameTime();
 
-        // Reset hover, find the topmost hovered card if returning true backwards
+        // Find the topmost hovered card first
         int hoveredIndex = -1;
         for (int i = numCards - 1; i >= 0; i--)
         {
             var card = game.PlayerHand[i];
-            card.IsHovered = false;
             card.TargetX = startX + i * spacing;
 
             // Initialize X,Y if 0 so they don't fly from top-left on draw
@@ -81,24 +80,28 @@ public static class GameUI
             var rect = new Rectangle(card.X, card.Y, RendererUtils.CardWidth * card.Scale, RendererUtils.CardHeight * card.Scale);
             if (hoveredIndex == -1 && Raylib.CheckCollisionPointRec(mousePos, rect))
             {
-                if (!card.IsHovered)
-                {
-                    AudioEngine.PlaySlide();
-                }
-                card.IsHovered = true;
                 hoveredIndex = i;
-                if (Raylib.IsMouseButtonPressed(MouseButton.Left))
+            }
+        }
+
+        // Apply hover state and sounds
+        for (int i = 0; i < numCards; i++)
+        {
+            var card = game.PlayerHand[i];
+            bool isNowHovered = (i == hoveredIndex);
+
+            card.IsHovered = isNowHovered;
+
+            if (isNowHovered && Raylib.IsMouseButtonPressed(MouseButton.Left))
+            {
+                // If we are trying to select a new card, check the limit
+                if (!card.IsSelected && game.PlayerHand.Count(c => c.IsSelected) >= GameConfig.MaxSelectedCards)
                 {
-                    // If we are trying to select a new card, check the limit
-                    if (!card.IsSelected && game.PlayerHand.Count(c => c.IsSelected) >= GameConfig.MaxSelectedCards)
-                    {
-                        // Play error sound or just ignore
-                    }
-                    else
-                    {
-                        AudioEngine.PlayBlip();
-                        card.IsSelected = !card.IsSelected;
-                    }
+                    // Play error sound or just ignore
+                }
+                else
+                {
+                    card.IsSelected = !card.IsSelected;
                 }
             }
         }
@@ -130,7 +133,8 @@ public static class GameUI
 
     private static void DrawGameplay(GameManager game)
     {
-        DrawHUD(game);
+        DrawLeftPanel(game, false);
+        DrawTopRightComponents(game);
 
         var selectedCards = game.PlayerHand.Where(c => c.IsSelected).ToList();
         if (selectedCards.Count > 0 && selectedCards.Count <= GameConfig.MaxSelectedCards)
@@ -152,8 +156,14 @@ public static class GameUI
                     _ => prediction.Type.ToString()
                 };
 
-                int w = Raylib.MeasureText($"Mão Ativa: {handName}", 30);
-                Raylib.DrawText($"Mão Ativa: {handName}", (GameConfig.WindowWidth - w) / 2, 410, 30, Color.Gold);
+                int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, out var tempState);
+
+                int w = Raylib.MeasureText($"{handName}", 30);
+                Raylib.DrawText($"{handName}", 280 + (GameConfig.WindowWidth - 280 - w) / 2, 380, 30, Color.Gold);
+
+                string expectText = $"{tempState.Chips} X {tempState.Multiplier} = {ExpectedScore}";
+                int hw = Raylib.MeasureText(expectText, 20);
+                Raylib.DrawText(expectText, 280 + (GameConfig.WindowWidth - 280 - hw) / 2, 420, 20, Color.LightGray);
             }
             catch { }
         }
@@ -164,41 +174,105 @@ public static class GameUI
         }
 
         // Action and Sort Buttons positioned BELOW the cards
-        int actionBtnY = 660; // Just below the cards (which sit around baseY=500, CardHeight=150 -> 650 is the bottom)
+        int actionBtnY = GameConfig.WindowHeight - 70; // Just below the cards
+
+        // Deck visual at bottom right
+        Rectangle deckRect = new Rectangle(GameConfig.WindowWidth - 140, GameConfig.WindowHeight - 190, 110, 160);
+        Raylib.DrawRectangleRounded(deckRect, 0.1f, 10, Color.LightGray);
 
         // Draw background panel for bottom HUD
-        Raylib.DrawRectangle(0, 650, GameConfig.WindowWidth, 70, new Color(20, 40, 30, 255));
-        Raylib.DrawLine(0, 650, GameConfig.WindowWidth, 650, Color.DarkGray);
+        Raylib.DrawRectangle(280, GameConfig.WindowHeight - 80, GameConfig.WindowWidth - 280, 80, new Color(20, 40, 30, 255));
+        Raylib.DrawLine(280, GameConfig.WindowHeight - 80, GameConfig.WindowWidth, GameConfig.WindowHeight - 80, Color.DarkGray);
+        Raylib.DrawRectangleRoundedLines(deckRect, 0.1f, 10, Color.Black);
+        Raylib.DrawText($"{game.Deck.Count}/52", GameConfig.WindowWidth - 105, GameConfig.WindowHeight - 25, 20, Color.White);
 
-        if (RendererUtils.DrawButton("JOGAR MÃO", GameConfig.WindowWidth / 2 + 100, actionBtnY, 220, 45))
-            game.PlayHand();
+        int centerX = 280 + (GameConfig.WindowWidth - 280) / 2;
 
-        if (RendererUtils.DrawButton("DESCARTAR", GameConfig.WindowWidth / 2 + 340, actionBtnY, 220, 45))
+        int btnW = 160;
+        int gap = 15;
+        int totalW = (btnW * 4) + (gap * 3);
+        int sx = centerX - (totalW / 2);
+
+        if (RendererUtils.DrawButton("DESCARTAR", sx, actionBtnY, btnW, 45, new Color(200, 50, 50, 255), new Color(150, 30, 30, 255)))
             game.DiscardSelected();
 
-        if (RendererUtils.DrawButton("ORDENAR VALOR", GameConfig.WindowWidth / 2 - 300, actionBtnY, 200, 45))
+        sx += btnW + gap;
+        if (RendererUtils.DrawButton("POR RANK", sx, actionBtnY, btnW, 45))
             game.SortHandByRank();
 
-        if (RendererUtils.DrawButton("ORDENAR NAIPE", GameConfig.WindowWidth / 2 - 520, actionBtnY, 200, 45))
+        sx += btnW + gap;
+        if (RendererUtils.DrawButton("POR NAIPE", sx, actionBtnY, btnW, 45))
             game.SortHandBySuit();
+
+        sx += btnW + gap;
+        if (RendererUtils.DrawButton("JOGAR MÃO", sx, actionBtnY, btnW, 45, new Color(50, 160, 80, 255), new Color(30, 110, 50, 255)))
+            game.PlayHand();
     }
 
-    private static void DrawHUD(GameManager game)
+    public static void DrawLeftPanel(GameManager game, bool isShop)
     {
-        // Current/Target Score
-        Raylib.DrawText($"SCORE", 50, 50, 30, Color.White);
-        Raylib.DrawText($"{game.CurrentScore} / {GameConfig.TargetScore}", 50, 80, 40, Color.Red);
+        // Dark Side Panel Background
+        Raylib.DrawRectangle(0, 0, 280, GameConfig.WindowHeight, new Color(20, 30, 25, 255));
+        Raylib.DrawLineEx(new Vector2(280, 0), new Vector2(280, GameConfig.WindowHeight), 4, new Color(40, 100, 120, 255));
 
-        // Hands / Discards
-        Raylib.DrawText($"MAOS: {game.HandsLeft}", 50, 200, 30, Color.Blue);
-        Raylib.DrawText($"DESCARTES: {game.DiscardsLeft}", 50, 240, 30, Color.Orange);
+        // Blind Info / Shop Header
+        Raylib.DrawRectangle(10, 10, 260, 60, new Color(40, 60, 80, 255));
+        if (isShop)
+        {
+            Raylib.DrawText("LOJA", 100, 25, 30, Color.Gold);
+        }
+        else
+        {
+            Raylib.DrawText("Small Blind", 60, 25, 30, Color.White);
+            Raylib.DrawText($"Meta: {GameConfig.TargetScore}", 20, 80, 20, Color.Red);
+            Raylib.DrawText("Recompensa: $$$", 20, 110, 20, Color.Gold);
+        }
 
-        // Jokers (Center top)
-        int totalJokersWidth = game.SelectedJokers.Count * 120;
-        int startX = (GameConfig.WindowWidth - totalJokersWidth) / 2 - 50;
+        // Round Score
+        Raylib.DrawRectangle(10, 150, 260, 50, new Color(50, 50, 50, 255));
+        Raylib.DrawText("Round Score", 20, 165, 20, Color.LightGray);
+        Raylib.DrawText(game.CurrentScore.ToString(), 160, 160, 30, Color.White);
+
+        if (!isShop)
+        {
+            // Run Info (Hands / Discards)
+            Raylib.DrawRectangle(10, 400, 135, 120, new Color(60, 40, 40, 255));
+            Raylib.DrawText("Run Info", 35, 410, 15, Color.LightGray);
+
+            Raylib.DrawText($"Hands", 20, 440, 20, Color.SkyBlue);
+            Raylib.DrawText($"{game.HandsLeft}", 105, 440, 20, Color.White);
+
+            Raylib.DrawText($"Discards", 15, 480, 20, Color.Orange);
+            Raylib.DrawText($"{game.DiscardsLeft}", 105, 480, 20, Color.White);
+        }
+
+        // Money
+        Raylib.DrawRectangle(155, 400, 115, 60, new Color(40, 40, 40, 255));
+        Raylib.DrawText($"${game.Money}", 170, 415, 30, Color.Gold);
+
+        // Options
+        if (RendererUtils.DrawButton("Opções", 10, GameConfig.WindowHeight - 160, 260, 40))
+        {
+            // Pause menu logic here later
+        }
+
+        // Ante / Round Info
+        Raylib.DrawRectangle(10, GameConfig.WindowHeight - 100, 125, 60, new Color(30, 30, 30, 255));
+        Raylib.DrawText("Ante", 50, GameConfig.WindowHeight - 95, 15, Color.LightGray);
+        Raylib.DrawText($"{game.CurrentAnte}/8", 50, GameConfig.WindowHeight - 70, 20, Color.Gold);
+
+        Raylib.DrawRectangle(145, GameConfig.WindowHeight - 100, 125, 60, new Color(30, 30, 30, 255));
+        Raylib.DrawText("Round", 185, GameConfig.WindowHeight - 95, 15, Color.LightGray);
+        Raylib.DrawText($"{game.CurrentBlind}", 195, GameConfig.WindowHeight - 70, 20, Color.Gold);
+    }
+
+    private static void DrawTopRightComponents(GameManager game)
+    {
+        // Jokers (Left to right near top, starting after left panel)
+        int startX = 300;
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
-            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 120, 50, false, 0.8f);
+            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 110, 20, false, 0.75f);
         }
 
         // Consumables in top right
@@ -206,31 +280,22 @@ public static class GameUI
         for (int i = 0; i < game.Consumables.Count; i++)
         {
             var item = game.Consumables[i];
-            float ix = startConsumableX + i * 130;
-            float iy = 60; // Placed higher to match Joker height
+            float ix = startConsumableX + i * 120;
+            float iy = 20;
 
-            // Calculate mouse collision manually for hover
-            var rect = new Rectangle(ix, iy, 150 * 0.8f, 240 * 0.8f);
+            var rect = new Rectangle(ix, iy, 150 * 0.75f, 240 * 0.75f);
             bool isHovered = Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), rect);
-            
-            // Draw unified scalable consumable
-            RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.8f);
 
-            // Use button below consumable
-            if (RendererUtils.DrawButton("USE", ix + 10, iy + 210, 100, 30))
+            RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.75f);
+
+            if (RendererUtils.DrawButton("USE", ix + 5, iy + 190, 100, 30))
             {
-                // Play sound
-                AudioEngine.PlayScore();
-
-                // Discard the selected cards if it's a Tarot
                 if (item.Type == ConsumableType.Tarot)
                 {
-                    // In lack of Enhanced Cards right now, we just "consume" the item and play sound.
+                    // Action handled here
                 }
-
-                // Remove item from inventory
                 game.Consumables.RemoveAt(i);
-                return; // Early return to avoid Collection Modified exception since we are inside drawing loop
+                return;
             }
         }
     }
@@ -239,19 +304,23 @@ public static class GameUI
     {
         DrawGameplay(game); // Draw background behind it
 
-        // Draw translucent dark panel
-        Raylib.DrawRectangle(0, 0, GameConfig.WindowWidth, GameConfig.WindowHeight, new Color(0, 0, 0, 180));
+        // Draw translucent dark panel overlaying only the game area (excluding left panel if possible, but let's just overlay all for focus)
+        Raylib.DrawRectangle(0, 0, GameConfig.WindowWidth, GameConfig.WindowHeight, new Color(0, 0, 0, 200));
 
-        // Score display
-        Raylib.DrawText(game.LastHandType, GameConfig.WindowWidth / 2 - 150, 200, 50, Color.Gold);
+        // Let's draw a nice Cash Out looking box
+        Rectangle box = new Rectangle(GameConfig.WindowWidth / 2 - 250, 150, 500, 300);
+        Raylib.DrawRectangleRounded(box, 0.1f, 10, new Color(40, 40, 40, 255));
+        Raylib.DrawRectangleRoundedLines(box, 0.1f, 10, Color.Gold);
+
+        Raylib.DrawText(game.LastHandType, (int)box.X + 150, (int)box.Y + 30, 40, Color.Gold);
 
         string scoreText = $"{game.LastScoreState?.Chips} X {game.LastScoreState?.Multiplier}";
-        Raylib.DrawText(scoreText, GameConfig.WindowWidth / 2 - 150, 300, 60, Color.Red);
+        Raylib.DrawText(scoreText, (int)box.X + 180, (int)box.Y + 100, 40, Color.Red);
 
         string totalText = $"+ {game.LastScorePlayed} PONTOS";
-        Raylib.DrawText(totalText, GameConfig.WindowWidth / 2 - 200, 400, 50, Color.Green);
+        Raylib.DrawText(totalText, (int)box.X + 130, (int)box.Y + 160, 40, Color.Green);
 
-        if (RendererUtils.DrawButton("CONTINUAR", GameConfig.WindowWidth / 2 - 100, 550, 200, 50))
+        if (RendererUtils.DrawButton("CONTINUAR", (int)box.X + 150, (int)box.Y + 230, 200, 50))
         {
             game.FinishScoreAnimation();
         }

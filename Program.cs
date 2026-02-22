@@ -9,10 +9,9 @@ class Program
 {
     static void Main(string[] args)
     {
-        Raylib.InitWindow(GameConfig.WindowWidth, GameConfig.WindowHeight, "Balatro 101 Prototype");
+        Raylib.InitWindow(GameConfig.WindowWidth, GameConfig.WindowHeight, "Balatro do J.A.");
         Raylib.SetTargetFPS(GameConfig.FPS);
 
-        AudioEngine.Initialize();
 
         GameManager game = new GameManager();
 
@@ -21,7 +20,6 @@ class Program
             GameUI.UpdateAndDraw(game);
         }
 
-        AudioEngine.Close();
         Raylib.CloseWindow();
     }
 }

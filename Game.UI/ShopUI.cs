@@ -17,11 +17,19 @@ public static class ShopUI
         shopConsumables.Clear();
         shopJokers.Clear();
 
-        shopConsumables.Add(new TheFool());
-        shopConsumables.Add(new Mercury());
+        var allConsumables = new List<IConsumable>
+        {
+            new TheHierophant(), new TheEmpress(), new TheMagician(), new TheLovers(), new TheChariot(), new Justice(),
+            new Pluto(), new Mercury(), new Uranus(), new Venus(), new Saturn(), new Jupiter()
+        };
+
+        var rnd = new System.Random();
+        for (int i = 0; i < 2; i++)
+        {
+            shopConsumables.Add(allConsumables[rnd.Next(allConsumables.Count)]);
+        }
 
         // Add 2 random Jokers to the shop
-        var rnd = new System.Random();
         for (int i = 0; i < 2; i++)
         {
             var randomJoker = game.AllJokers[rnd.Next(game.AllJokers.Count)];
@@ -49,26 +57,27 @@ public static class ShopUI
     {
         Raylib.DrawRectangle(0, 0, GameConfig.WindowWidth, GameConfig.WindowHeight, new Color(40, 30, 20, 255));
 
-        Raylib.DrawText("SHOP", 50, 30, 40, Color.White);
-        Raylib.DrawText($"Money: ${game.Money}", GameConfig.WindowWidth - 250, 30, 40, Color.Gold);
+        GameUI.DrawLeftPanel(game, true);
 
         Vector2 mousePos = Raylib.GetMousePosition();
         bool actionTaken = false;
 
-        // 1. Draw Inventory (Top Left)
-        Raylib.DrawText($"INVENTORY ({game.SelectedJokers.Count}/5 Jokers)", 50, 75, 20, Color.LightGray);
+        // Content area starts at X = 320 to avoiding Left Panel
+        int shopContentX = 320;
+
+        // 1. Draw Inventory (Top)
+        Raylib.DrawText($"INVENTORY ({game.SelectedJokers.Count}/5 Jokers)", shopContentX, 30, 20, Color.LightGray);
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
             var joker = game.SelectedJokers[i];
-            float jx = 50 + i * 110;
-            float jy = 105;
+            float jx = shopContentX + i * 110;
+            float jy = 60;
             // Draw joker in smaller scale for inventory
             RendererUtils.DrawJoker(joker, jx, jy, false, 0.7f);
 
             // Sell Button below inventory item
             if (!actionTaken && RendererUtils.DrawButton("SELL $2", jx, jy + 160, 90, 30))
             {
-                AudioEngine.PlayCoin();
                 game.Money += 2;
                 game.SelectedJokers.RemoveAt(i);
                 actionTaken = true;
@@ -77,12 +86,12 @@ public static class ShopUI
         }
 
         // 1.b Draw Inventory Consumables
-        Raylib.DrawText($"CONSUMABLES ({game.Consumables.Count}/{GameConfig.MaxConsumables})", 700, 75, 20, Color.LightGray);
+        Raylib.DrawText($"CONSUMABLES ({game.Consumables.Count}/{GameConfig.MaxConsumables})", shopContentX + 580, 30, 20, Color.LightGray);
         for (int i = 0; i < game.Consumables.Count; i++)
         {
             var item = game.Consumables[i];
-            float ix = 700 + i * 120;
-            float iy = 105;
+            float ix = shopContentX + 580 + i * 120;
+            float iy = 60;
 
             // Draw scale down consumable
             RendererUtils.DrawConsumable(item, ix, iy, false, 0.65f);
@@ -90,7 +99,6 @@ public static class ShopUI
             // Sell Button below inventory item
             if (!actionTaken && RendererUtils.DrawButton("SELL $1", ix, iy + 165, 90, 30))
             {
-                AudioEngine.PlayCoin();
                 game.Money += 1;
                 game.Consumables.RemoveAt(i);
                 actionTaken = true;
@@ -99,8 +107,8 @@ public static class ShopUI
         }
 
         // 2. Draw Shop Offerings (Bottom)
-        Raylib.DrawText("FOR SALE", 50, 320, 20, Color.LightGray);
-        int startX = 50;
+        Raylib.DrawText("FOR SALE", shopContentX, 320, 20, Color.LightGray);
+        int startX = shopContentX;
         int y = 350;
 
         // Draw Consumables
@@ -119,7 +127,6 @@ public static class ShopUI
             {
                 if (game.Money >= item.Cost && game.Consumables.Count < GameConfig.MaxConsumables)
                 {
-                    AudioEngine.PlayCoin();
                     game.Money -= item.Cost;
                     game.Consumables.Add(item);
                     shopConsumables.RemoveAt(i);
@@ -143,7 +150,6 @@ public static class ShopUI
             {
                 if (game.Money >= cost && game.SelectedJokers.Count < 5)
                 {
-                    AudioEngine.PlayCoin();
                     game.Money -= cost;
                     game.SelectedJokers.Add(joker);
                     shopJokers.RemoveAt(i);
@@ -154,7 +160,7 @@ public static class ShopUI
         }
 
         // NEXT BLIND BUTTON
-        if (RendererUtils.DrawButton($"NEXT BLIND (ANTE {game.CurrentAnte})", GameConfig.WindowWidth - 350, GameConfig.WindowHeight - 100, 300, 50))
+        if (RendererUtils.DrawButton($"NEXT BLIND (ANTE {game.CurrentAnte})", GameConfig.WindowWidth - 300, GameConfig.WindowHeight - 80, 280, 60))
         {
             shopInitialized = false;
             game.StartBlind();

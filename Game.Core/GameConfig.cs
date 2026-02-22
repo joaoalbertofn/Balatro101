@@ -11,7 +11,7 @@ public static class GameConfig
     public static int MaxConsumables = 2;
 
     // Rendering Parameters
-    public const int WindowWidth = 1280;
-    public const int WindowHeight = 720;
+    public const int WindowWidth = 1600;
+    public const int WindowHeight = 900;
     public const int FPS = 60;
 }

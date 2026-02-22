@@ -45,7 +45,18 @@ public class GameManager
             new CrazyJoker(),
             new LuckyJoker(),
             new RedJoker(),
-            new SupremeJoker()
+            new SupremeJoker(),
+            new ClubsJoker(),
+            new DiamondsJoker(),
+            new BaseMultiplierJoker(),
+            new StraightJoker(),
+            new TwoPairJoker(),
+            new FaceCardJoker(),
+            new BlackJoker(),
+            new AcesJoker(),
+            new FullHouseJoker(),
+            new FourOfAKindJoker(),
+            new EvenJoker()
         };
     }
 
@@ -102,7 +113,9 @@ public class GameManager
         }
 
         if (drewAny)
-            AudioEngine.PlayShuffle();
+        {
+            // sound removed
+        }
 
         if (CurrentSortMode == SortMode.Rank) SortHandByRank();
         else if (CurrentSortMode == SortMode.Suit) SortHandBySuit();
@@ -148,7 +161,6 @@ public class GameManager
 
         CurrentScore += LastScorePlayed;
         CurrentState = GameState.AnimacaoPontuacao;
-        AudioEngine.PlayScore();
     }
 
     public void SortHandByRank()
