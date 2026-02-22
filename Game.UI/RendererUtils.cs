@@ -244,7 +244,7 @@ public static class RendererUtils
         Raylib.DrawRectangle(cx - size / 4, cy, size / 2, size, color);
     }
 
-    public static void DrawJoker(IJoker joker, float x, float y, bool isSelected = false, float scale = 1.0f)
+    public static void DrawJoker(IJoker joker, float x, float y, bool isSelected = false, float scale = 1.0f, float baseRotation = 0f)
     {
         float width = 140 * scale;
         float height = 210 * scale;
@@ -265,13 +265,13 @@ public static class RendererUtils
         float shadowOffsetX = (x - GameConfig.WindowWidth / 2f) * 0.03f;
         Raylib.DrawRectangleRounded(new Rectangle(x + shadowOffsetX, y + 15, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
 
-        // 4. Fake 3D Rotation on hover
-        float rot = 0f;
+        // 4. Fake 3D Rotation on hover + Physics Wobble
+        float rot = baseRotation;
         if (isHovered)
         {
             float centerX = x + width / 2;
             float mouseDistanceX = InputManager.VirtualCursor.X - centerX;
-            rot = mouseDistanceX * 0.05f;
+            rot += mouseDistanceX * 0.05f;
         }
 
         Rlgl.PushMatrix();

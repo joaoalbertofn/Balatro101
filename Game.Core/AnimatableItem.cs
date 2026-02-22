@@ -20,4 +20,20 @@ public abstract class AnimatableItem
 
     public bool IsHovered { get; set; }
     public bool IsSelected { get; set; }
+
+    /// <summary>
+    /// Instantly increases the scale so the spring physics can snap it back down.
+    /// </summary>
+    public void BumpScale(float amount = 1.3f)
+    {
+        Scale = amount;
+    }
+
+    /// <summary>
+    /// Injects rotational velocity so the spring physics wobbles the item back to target rotation.
+    /// </summary>
+    public void Wobble(float velocity = 25f)
+    {
+        VelocityRotation = velocity;
+    }
 }

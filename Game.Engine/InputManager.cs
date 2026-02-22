@@ -109,12 +109,15 @@ public static class InputManager
         for (int gid = 0; gid < 8; gid++)
         {
             if (!Raylib.IsGamepadAvailable(gid)) continue;
-            if (Raylib.IsGamepadButtonPressed(gid, GamepadButton.RightFaceDown) || Raylib.IsGamepadButtonPressed(gid, GamepadButton.RightFaceRight)) // A and X as selection
+            // A button (bottom) or Keyboard.A
+            if (Raylib.IsGamepadButtonPressed(gid, GamepadButton.RightFaceDown))
             {
                 gamepad = true;
                 break;
             }
         }
+
+        if (Raylib.IsKeyPressed(KeyboardKey.A) || Raylib.IsKeyPressed(KeyboardKey.Space)) return true;
 
         if (!includeMouse) return gamepad;
         return gamepad || Raylib.IsMouseButtonPressed(MouseButton.Left);
@@ -165,13 +168,33 @@ public static class InputManager
         return gamepad || Raylib.IsKeyPressed(KeyboardKey.Escape) || Raylib.IsMouseButtonPressed(MouseButton.Right);
     }
 
-    // Botão 'Y' para inspecionar deck ou usar item especial
-    public static bool IsInspectActionPressed()
+    // Botão 'Y' para descartar cartas
+    public static bool IsDiscardActionPressed()
     {
+        if (Raylib.IsKeyPressed(KeyboardKey.Y)) return true;
+
         for (int gid = 0; gid < 8; gid++)
         {
             if (!Raylib.IsGamepadAvailable(gid)) continue;
+            // Top Face button (Y)
             if (Raylib.IsGamepadButtonPressed(gid, GamepadButton.RightFaceUp))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Botão 'X' para Jogar a Mão
+    public static bool IsPlayActionPressed()
+    {
+        if (Raylib.IsKeyPressed(KeyboardKey.X)) return true;
+
+        for (int gid = 0; gid < 8; gid++)
+        {
+            if (!Raylib.IsGamepadAvailable(gid)) continue;
+            // Left Face button (X)
+            if (Raylib.IsGamepadButtonPressed(gid, GamepadButton.RightFaceLeft))
             {
                 return true;
             }

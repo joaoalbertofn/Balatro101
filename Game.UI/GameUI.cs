@@ -170,7 +170,7 @@ public static class GameUI
 
 
 
-    private static void DrawGameplay(GameManager game)
+    public static void DrawGameplay(GameManager game)
     {
         DrawLeftPanel(game, false);
         DrawTopRightComponents(game);
@@ -202,7 +202,7 @@ public static class GameUI
         int totalW = (btnW * 4) + (gap * 3);
         int sx = centerX - (totalW / 2);
 
-        if (RendererUtils.DrawButton("DESCARTAR", sx, actionBtnY, btnW, 45, new Color(200, 50, 50, 255), new Color(150, 30, 30, 255)))
+        if (RendererUtils.DrawButton("DESCARTAR (Y)", sx, actionBtnY, btnW, 45, new Color(200, 50, 50, 255), new Color(150, 30, 30, 255)) || InputManager.IsDiscardActionPressed())
             game.DiscardSelected();
 
         sx += btnW + gap;
@@ -214,7 +214,7 @@ public static class GameUI
             game.SortHandBySuit();
 
         sx += btnW + gap;
-        if (RendererUtils.DrawButton("JOGAR MÃO", sx, actionBtnY, btnW, 45, new Color(50, 160, 80, 255), new Color(30, 110, 50, 255)))
+        if (RendererUtils.DrawButton("JOGAR MÃO (X)", sx, actionBtnY, btnW, 45, new Color(50, 160, 80, 255), new Color(30, 110, 50, 255)) || InputManager.IsPlayActionPressed())
             game.PlayHand();
     }
 
@@ -281,15 +281,40 @@ public static class GameUI
         if (!isShop)
         {
             var selectedCards = game.PlayerHand.Where(c => c.IsSelected).ToList();
-            if (selectedCards.Count > 0 && selectedCards.Count <= GameConfig.MaxSelectedCards)
+            if (ScoreAnimator.IsAnimating || (selectedCards.Count > 0 && selectedCards.Count <= GameConfig.MaxSelectedCards))
             {
                 try
                 {
-                    var prediction = HandEvaluator.Evaluate(selectedCards);
-                    string handName = prediction.Type.ToString(); // Keep simple switch logic
-                    int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, game.CurrentBossDebuff, out var tempState);
+                    string handName;
+                    int chipsVal;
+                    int multVal;
+
+                    if (ScoreAnimator.IsAnimating)
+                    {
+                        handName = game.LastHandType;
+                        chipsVal = ScoreAnimator.DisplayChips;
+                        multVal = ScoreAnimator.DisplayMult;
+                    }
+                    else
+                    {
+                        var prediction = HandEvaluator.Evaluate(selectedCards);
+                        handName = prediction.Type.ToString();
+                        game.ScoringEngine.CalculateScore(prediction, game.CurrentBossDebuff, out var tempState);
+                        chipsVal = tempState.Chips;
+                        multVal = tempState.Multiplier;
+                    }
 
                     int predStartY = 215;
+
+                    Rlgl.PushMatrix();
+                    if (ScoreAnimator.IsAnimating)
+                    {
+                        float scale = ScoreAnimator.BoxesScale;
+                        Rlgl.Translatef(135, 260, 0);
+                        Rlgl.Scalef(scale, scale, 1f);
+                        Rlgl.Translatef(-135, -260, 0);
+                    }
+
                     Raylib.DrawRectangleRounded(new Rectangle(15, predStartY, 240, 90), 0.2f, 10, new Color(30, 30, 30, 255));
 
                     int handNameW = Raylib.MeasureText(handName, 20);
@@ -297,15 +322,17 @@ public static class GameUI
 
                     // Chips Pill (Blue)
                     Raylib.DrawRectangleRounded(new Rectangle(25, predStartY + 40, 95, 35), 0.5f, 10, new Color(41, 128, 185, 255));
-                    string chipsStr = tempState.Chips.ToString();
+                    string chipsStr = chipsVal.ToString();
                     Raylib.DrawText(chipsStr, 25 + (95 - Raylib.MeasureText(chipsStr, 22)) / 2, predStartY + 48, 22, Color.White);
 
                     // Mult Pill (Red)
                     Raylib.DrawRectangleRounded(new Rectangle(150, predStartY + 40, 95, 35), 0.5f, 10, new Color(230, 60, 60, 255));
-                    string multStr = tempState.Multiplier.ToString();
+                    string multStr = multVal.ToString();
                     Raylib.DrawText(multStr, 150 + (95 - Raylib.MeasureText(multStr, 22)) / 2, predStartY + 48, 22, Color.White);
 
                     Raylib.DrawText("X", 128, predStartY + 48, 20, Color.LightGray);
+
+                    Rlgl.PopMatrix();
                 }
                 catch { }
             }
@@ -351,13 +378,45 @@ public static class GameUI
         Raylib.DrawText($"{game.CurrentBlind}", 215, botY + 30, 20, Color.White);
     }
 
+    public static Rectangle GetJokerRect(int index)
+    {
+        int startX = 300;
+        float width = 140 * 0.85f; // From RendererUtils
+        float height = 210 * 0.85f;
+        return new Rectangle(startX + index * 125, 20, width, height);
+    }
+
     private static void DrawTopRightComponents(GameManager game)
     {
         // Jokers (Left to right near top, starting after left panel)
-        int startX = 300;
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
-            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 125, 20, false, 0.85f);
+            var joker = game.SelectedJokers[i];
+            var rect = GetJokerRect(i);
+
+            if (joker is AnimatableItem animJoker)
+            {
+                animJoker.TargetX = rect.X;
+                animJoker.TargetY = rect.Y;
+                animJoker.TargetRotation = 0f;
+                animJoker.TargetScale = 0.85f;
+
+                // Initialize positions if newborn
+                if (animJoker.X == 0f && animJoker.Y == 0f)
+                {
+                    animJoker.X = rect.X;
+                    animJoker.Y = rect.Y;
+                    animJoker.Scale = 0.85f;
+                }
+
+                TweenEngine.UpdatePhysics(animJoker, Raylib.GetFrameTime());
+
+                RendererUtils.DrawJoker(joker, animJoker.X, animJoker.Y, false, animJoker.Scale, animJoker.Rotation);
+            }
+            else
+            {
+                RendererUtils.DrawJoker(joker, rect.X, rect.Y, false, 0.85f);
+            }
         }
 
         // Consumables in top right
@@ -409,38 +468,7 @@ public static class GameUI
 
     private static void DrawScoreAnimation(GameManager game)
     {
-        DrawGameplay(game); // Draw background behind it
-
-        // Draw translucent dark panel overlaying only the game area (excluding left panel if possible, but let's just overlay all for focus)
-        Raylib.DrawRectangle(0, 0, GameConfig.WindowWidth, GameConfig.WindowHeight, new Color(0, 0, 0, 200));
-
-        // Let's draw a nice Cash Out looking box
-        Rectangle box = new Rectangle(GameConfig.WindowWidth / 2 - 250, 150, 500, 300);
-        Raylib.DrawRectangleRounded(box, 0.1f, 10, new Color(40, 40, 40, 255));
-        Raylib.DrawRectangleRoundedLines(box, 0.1f, 10, Color.Gold);
-
-        // Explode particles when this state begins initially (hacky way: do it if timer just started)
-        if (game.ShakeTimer > 0.48f) // Just triggered
-        {
-            // Emit chips on the left (blue) and mults on the right (red)
-            ParticleSystem.EmitScoreSpark(new Vector2(box.X + 150, box.Y + 200), 30, false);
-            ParticleSystem.EmitScoreSpark(new Vector2(box.X + 350, box.Y + 200), 30, true);
-        }
-
-        Raylib.DrawText(game.LastHandType, (int)box.X + 150, (int)box.Y + 30, 40, Color.Gold);
-
-        string scoreText = $"{game.LastScoreState?.Chips} X {game.LastScoreState?.Multiplier}";
-        Raylib.DrawText(scoreText, (int)box.X + 180, (int)box.Y + 100, 40, Color.Red);
-
-        string totalText = $"+ {game.LastScorePlayed} PONTOS";
-        Raylib.DrawText(totalText, (int)box.X + 130, (int)box.Y + 160, 40, Color.Green);
-
-        ParticleSystem.UpdateAndDraw(Raylib.GetFrameTime());
-
-        if (RendererUtils.DrawButton("CONTINUAR", (int)box.X + 150, (int)box.Y + 230, 200, 50))
-        {
-            game.FinishScoreAnimation();
-        }
+        ScoreAnimator.UpdateAndDraw(Raylib.GetFrameTime());
     }
 
     private static void DrawGameOver(GameManager game)

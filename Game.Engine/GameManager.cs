@@ -197,34 +197,22 @@ public class GameManager
 
         LastHandType = handResult.Type.ToString();
         LastHandResult = handResult;
-        LastHandResult = handResult;
         LastScoreState = finalState;
-
-        // Apply Screen Shake for big hands
-        if (LastScorePlayed > GameConfig.TargetScore * 0.5f) // Big enough to shake
-        {
-            ShakeMagnitude = 15f + (LastScorePlayed / (float)GameConfig.TargetScore) * 5f; // Scales nicely
-            ShakeMagnitude = System.Math.Clamp(ShakeMagnitude, 10f, 40f);
-            ShakeTimer = 0.5f; // Shake for half a second
-        }
-
-        // Remove played cards
-        foreach (var card in selectedCards)
-        {
-            PlayerHand.Remove(card);
-        }
 
         if (CurrentBossDebuff == BossDebuffType.TheHook)
         {
             var rnd = System.Random.Shared;
-            for (int i = 0; i < 2 && PlayerHand.Count > 0; i++)
+            var remainingHand = PlayerHand.Where(c => !c.IsSelected).ToList();
+            for (int i = 0; i < 2 && remainingHand.Count > 0; i++)
             {
-                PlayerHand.RemoveAt(rnd.Next(PlayerHand.Count));
+                var target = remainingHand[rnd.Next(remainingHand.Count)];
+                PlayerHand.Remove(target);
+                remainingHand.Remove(target);
             }
         }
 
-        CurrentScore += LastScorePlayed;
         CurrentState = GameState.AnimacaoPontuacao;
+        ScoreAnimator.StartSequence(this, handResult, finalState, LastScorePlayed);
     }
 
     public void SortHandByRank()
