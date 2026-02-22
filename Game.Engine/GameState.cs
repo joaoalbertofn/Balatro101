@@ -9,5 +9,6 @@ public enum GameState
     ShopTransition,
     Shop,
     Shuffling,
+    BossIntro,
     GameOver
 }

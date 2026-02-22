@@ -12,12 +12,29 @@ public static class GameUI
     {
         float dt = Raylib.GetFrameTime();
 
+        // Screen Shake Logic
+        float shakeOffsetX = 0f;
+        float shakeOffsetY = 0f;
+        if (game.ShakeTimer > 0)
+        {
+            game.ShakeTimer -= dt;
+            float mag = game.ShakeMagnitude * (game.ShakeTimer / 0.5f); // Fade out shake
+            shakeOffsetX = (float)(new Random().NextDouble() * 2f - 1f) * mag;
+            shakeOffsetY = (float)(new Random().NextDouble() * 2f - 1f) * mag;
+        }
+
         // Smooth card animations
         if (game.CurrentState is GameState.FaseGameplay or GameState.AnimacaoPontuacao)
             UpdateCardsLogic(game);
 
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(30, 60, 40, 255));
+
+        if (game.ShakeTimer > 0)
+        {
+            Rlgl.PushMatrix();
+            Rlgl.Translatef(shakeOffsetX, shakeOffsetY, 0);
+        }
 
         switch (game.CurrentState)
         {
@@ -45,7 +62,16 @@ public static class GameUI
                 break;
         }
 
+        if (game.ShakeTimer > 0)
+        {
+            Rlgl.PopMatrix();
+        }
+
         RendererUtils.DrawTooltip();
+
+        // Draw the virtual cursor
+        Raylib.DrawCircleV(InputManager.VirtualCursor, 8f, new Color(255, 100, 100, 200));
+        Raylib.DrawCircleLines((int)InputManager.VirtualCursor.X, (int)InputManager.VirtualCursor.Y, 8f, Color.White);
 
         Raylib.EndDrawing();
     }
@@ -63,12 +89,12 @@ public static class GameUI
     {
         if (game.CurrentState != GameState.FaseGameplay) return;
 
-        Vector2 mousePos = Raylib.GetMousePosition();
+        Vector2 mousePos = InputManager.VirtualCursor;
         int numCards = game.PlayerHand.Count;
         float spacing = 110f;
         float totalWidth = numCards * spacing;
         float startX = 280 + (GameConfig.WindowWidth - 280 - totalWidth) / 2; // Fixed spacing using 280 for left panel
-        float baseY = GameConfig.WindowHeight - 250f;
+        float baseY = GameConfig.WindowHeight - 290f; // Raised to avoid action bar clipping
         float dt = Raylib.GetFrameTime();
 
         // Find the topmost hovered card first
@@ -86,6 +112,9 @@ public static class GameUI
             }
 
             var rect = new Rectangle(card.X, card.Y, RendererUtils.CardWidth * card.Scale, RendererUtils.CardHeight * card.Scale);
+
+            UINavigator.RegisterNode(new UINode($"hand_card_{i}", rect, UINodeType.Card));
+
             if (hoveredIndex == -1 && Raylib.CheckCollisionPointRec(mousePos, rect))
             {
                 hoveredIndex = i;
@@ -100,7 +129,7 @@ public static class GameUI
 
             card.IsHovered = isNowHovered;
 
-            if (isNowHovered && Raylib.IsMouseButtonPressed(MouseButton.Left))
+            if (isNowHovered && InputManager.IsSelectActionPressed())
             {
                 // If we are trying to select a new card, check the limit
                 if (!card.IsSelected && game.PlayerHand.Count(c => c.IsSelected) >= GameConfig.MaxSelectedCards)
@@ -224,24 +253,30 @@ public static class GameUI
         Raylib.DrawRectangle(0, 0, 270, GameConfig.WindowHeight, new Color(45, 52, 54, 255));
         Raylib.DrawRectangle(268, 0, 4, GameConfig.WindowHeight, new Color(41, 128, 185, 255));
 
-        // Blind Header (Blue Pill)
-        Raylib.DrawRectangleRounded(new Rectangle(15, 15, 240, 40), 0.5f, 10, new Color(41, 128, 185, 255));
-        string blindName = game.CurrentAnte >= 1 ? "Small Blind" : "Tutorial";
-        int blindW = Raylib.MeasureText(blindName, 22);
-        Raylib.DrawText(blindName, 15 + (240 - blindW) / 2, 25, 22, Color.White);
+        // Blind Header (Blue Pill or Red if Boss)
+        Color headerColor = game.CurrentBlindType == BlindType.Boss ? new Color(180, 40, 40, 255) : new Color(41, 128, 185, 255);
+        Raylib.DrawRectangleRounded(new Rectangle(15, 15, 240, 40), 0.5f, 10, headerColor);
+
+        string blindName = game.CurrentBlindType == BlindType.Boss ? $"BOSS: {game.CurrentBossDebuff}" : $"{game.CurrentBlindType} Blind";
+        int fontSize = game.CurrentBlindType == BlindType.Boss ? 20 : 26;
+        int blindW = Raylib.MeasureText(blindName, fontSize);
+        Raylib.DrawText(blindName, 15 + (240 - blindW) / 2, 15 + (40 - fontSize) / 2, fontSize, Color.White);
 
         // Score at Least (Dark Gray Box)
-        Raylib.DrawRectangleRounded(new Rectangle(15, 65, 240, 60), 0.2f, 10, new Color(30, 30, 30, 255));
-        Raylib.DrawText("Score at least", 80, 75, 15, Color.LightGray);
-        Raylib.DrawText(GameConfig.TargetScore.ToString(), 120, 95, 24, new Color(230, 60, 60, 255));
-        Raylib.DrawText("Reward: $$$", 100, 130, 15, Color.Gold);
+        Raylib.DrawRectangleRounded(new Rectangle(15, 65, 240, 75), 0.2f, 10, new Color(30, 30, 30, 255));
+        string sAtLeast = "Score at least";
+        Raylib.DrawText(sAtLeast, 15 + (240 - Raylib.MeasureText(sAtLeast, 18)) / 2, 75, 18, Color.LightGray);
+        string targScore = GameConfig.TargetScore.ToString();
+        Raylib.DrawText(targScore, 15 + (240 - Raylib.MeasureText(targScore, 30)) / 2, 95, 30, new Color(230, 60, 60, 255));
+        string rwrd = "Reward: $$$";
+        Raylib.DrawText(rwrd, 15 + (240 - Raylib.MeasureText(rwrd, 18)) / 2, 120, 18, Color.Gold);
 
         // Round Score
-        Raylib.DrawRectangleRounded(new Rectangle(15, 155, 240, 45), 0.2f, 10, new Color(50, 50, 50, 255));
-        Raylib.DrawText("Round score", 25, 168, 18, Color.LightGray);
+        Raylib.DrawRectangleRounded(new Rectangle(15, 150, 240, 50), 0.2f, 10, new Color(50, 50, 50, 255));
+        Raylib.DrawText("Round score", 25, 165, 20, Color.LightGray);
         string cScoreStr = game.CurrentScore.ToString();
-        int cw = Raylib.MeasureText(cScoreStr, 24);
-        Raylib.DrawText(cScoreStr, 245 - cw, 165, 24, Color.White);
+        int cw = Raylib.MeasureText(cScoreStr, 28);
+        Raylib.DrawText(cScoreStr, 245 - cw, 160, 28, Color.White);
 
         if (!isShop)
         {
@@ -252,7 +287,7 @@ public static class GameUI
                 {
                     var prediction = HandEvaluator.Evaluate(selectedCards);
                     string handName = prediction.Type.ToString(); // Keep simple switch logic
-                    int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, out var tempState);
+                    int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, game.CurrentBossDebuff, out var tempState);
 
                     int predStartY = 215;
                     Raylib.DrawRectangleRounded(new Rectangle(15, predStartY, 240, 90), 0.2f, 10, new Color(30, 30, 30, 255));
@@ -279,22 +314,23 @@ public static class GameUI
             int infoStartY = 350;
             // Red Run Info block
             Raylib.DrawRectangleRounded(new Rectangle(15, infoStartY, 70, 90), 0.2f, 10, new Color(230, 60, 60, 255));
-            Raylib.DrawText("Run", 32, infoStartY + 25, 18, Color.White);
-            Raylib.DrawText("Info", 30, infoStartY + 45, 18, Color.White);
+            Raylib.DrawText("Run", 30, infoStartY + 25, 20, Color.White);
+            Raylib.DrawText("Info", 28, infoStartY + 45, 20, Color.White);
 
             // Hands Box
             Raylib.DrawRectangleRounded(new Rectangle(95, infoStartY, 75, 40), 0.2f, 10, new Color(50, 50, 50, 255));
-            Raylib.DrawText("Hands", 110, infoStartY + 5, 15, Color.SkyBlue);
-            Raylib.DrawText(game.HandsLeft.ToString(), 130, infoStartY + 22, 18, Color.White);
+            Raylib.DrawText("Hands", 108, infoStartY + 3, 16, Color.SkyBlue);
+            Raylib.DrawText(game.HandsLeft.ToString(), 125, infoStartY + 20, 22, Color.White);
 
             // Discards Box
             Raylib.DrawRectangleRounded(new Rectangle(180, infoStartY, 75, 40), 0.2f, 10, new Color(50, 50, 50, 255));
-            Raylib.DrawText("Discards", 188, infoStartY + 5, 15, Color.Orange);
-            Raylib.DrawText(game.DiscardsLeft.ToString(), 215, infoStartY + 22, 18, Color.White);
+            Raylib.DrawText("Discards", 185, infoStartY + 3, 16, Color.Orange);
+            Raylib.DrawText(game.DiscardsLeft.ToString(), 210, infoStartY + 20, 22, Color.White);
 
             // Money Box
             Raylib.DrawRectangleRounded(new Rectangle(95, infoStartY + 50, 160, 40), 0.2f, 10, new Color(50, 50, 50, 255));
-            Raylib.DrawText($"${game.Money}", 150, infoStartY + 60, 24, Color.Gold);
+            string cMoney = $"${game.Money}";
+            Raylib.DrawText(cMoney, 95 + (160 - Raylib.MeasureText(cMoney, 26)) / 2, infoStartY + 58, 26, Color.Gold);
         }
 
         // Bottom Pillars
@@ -333,7 +369,7 @@ public static class GameUI
             float iy = 20;
 
             var rect = new Rectangle(ix, iy, 140 * 0.85f, 210 * 0.85f);
-            bool isHovered = Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), rect);
+            bool isHovered = Raylib.CheckCollisionPointRec(InputManager.VirtualCursor, rect);
 
             RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.85f);
 
@@ -383,6 +419,14 @@ public static class GameUI
         Raylib.DrawRectangleRounded(box, 0.1f, 10, new Color(40, 40, 40, 255));
         Raylib.DrawRectangleRoundedLines(box, 0.1f, 10, Color.Gold);
 
+        // Explode particles when this state begins initially (hacky way: do it if timer just started)
+        if (game.ShakeTimer > 0.48f) // Just triggered
+        {
+            // Emit chips on the left (blue) and mults on the right (red)
+            ParticleSystem.EmitScoreSpark(new Vector2(box.X + 150, box.Y + 200), 30, false);
+            ParticleSystem.EmitScoreSpark(new Vector2(box.X + 350, box.Y + 200), 30, true);
+        }
+
         Raylib.DrawText(game.LastHandType, (int)box.X + 150, (int)box.Y + 30, 40, Color.Gold);
 
         string scoreText = $"{game.LastScoreState?.Chips} X {game.LastScoreState?.Multiplier}";
@@ -390,6 +434,8 @@ public static class GameUI
 
         string totalText = $"+ {game.LastScorePlayed} PONTOS";
         Raylib.DrawText(totalText, (int)box.X + 130, (int)box.Y + 160, 40, Color.Green);
+
+        ParticleSystem.UpdateAndDraw(Raylib.GetFrameTime());
 
         if (RendererUtils.DrawButton("CONTINUAR", (int)box.X + 150, (int)box.Y + 230, 200, 50))
         {

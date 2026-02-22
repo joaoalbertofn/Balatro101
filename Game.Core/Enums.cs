@@ -44,3 +44,19 @@ public enum SortMode
     Rank,
     Suit
 }
+
+public enum BlindType
+{
+    Small,
+    Big,
+    Boss
+}
+
+public enum BossDebuffType
+{
+    None,
+    TheHook,   // Discards 2 random cards per hand played
+    TheClub,   // All Club cards are debuffed
+    TheWindow, // Halves the max discards
+    ThePillar  // Reduces max hands by 1
+}

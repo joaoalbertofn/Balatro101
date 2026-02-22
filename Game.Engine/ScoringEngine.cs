@@ -7,7 +7,7 @@ public class ScoringEngine
 {
     public List<IJoker> ActiveJokers { get; } = new();
 
-    public int CalculateScore(HandResult handResult, out ScoreState finalState)
+    public int CalculateScore(HandResult handResult, BossDebuffType debuff, out ScoreState finalState)
     {
         finalState = new ScoreState
         {
@@ -18,8 +18,10 @@ public class ScoringEngine
         // First add base chips from the played scoring cards
         foreach (var card in handResult.ScoringCards)
         {
+            if (debuff == BossDebuffType.TheClub && card.Suit == Suit.Clubs) continue;
+
             finalState.Chips += card.GetValue();
-            
+
             // Trigger card specific jokers
             foreach (var joker in ActiveJokers)
             {

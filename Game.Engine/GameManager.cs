@@ -12,6 +12,12 @@ public class GameManager
     public int Money { get; set; } = 4;
     public int CurrentAnte { get; set; } = 1;
     public int CurrentBlind { get; set; } = 1;
+    public BlindType CurrentBlindType { get; set; } = BlindType.Small;
+    public BossDebuffType CurrentBossDebuff { get; set; } = BossDebuffType.None;
+
+    // Juice & Effects
+    public float ShakeMagnitude { get; set; } = 0f;
+    public float ShakeTimer { get; set; } = 0f;
 
     public int CurrentScore { get; set; }
     public int HandsLeft { get; set; }
@@ -73,7 +79,7 @@ public class GameManager
 
     public void RandomizeJokers()
     {
-        var rnd = new System.Random();
+        var rnd = System.Random.Shared;
         for (int i = 0; i < AllJokers.Count; i++)
         {
             int swapIndex = rnd.Next(AllJokers.Count);
@@ -88,10 +94,36 @@ public class GameManager
         CurrentState = GameState.Shuffling;
         shuffleTimer = 1.5f; // 1.5 seconds shuffle animation
 
+        // Determine Blind Type
+        CurrentBlindType = CurrentBlind switch
+        {
+            1 => BlindType.Small,
+            2 => BlindType.Big,
+            _ => BlindType.Boss
+        };
+
+        if (CurrentBlindType == BlindType.Boss)
+        {
+            // Pick a random debuff
+            var debuffs = new[] { BossDebuffType.TheHook, BossDebuffType.TheClub, BossDebuffType.TheWindow, BossDebuffType.ThePillar };
+            CurrentBossDebuff = debuffs[System.Random.Shared.Next(debuffs.Length)];
+        }
+        else
+        {
+            CurrentBossDebuff = BossDebuffType.None;
+        }
+
         CurrentScore = 0;
-        GameConfig.TargetScore = 300 * CurrentAnte; // Scale Difficulty
+
+        // Scale Target Score
+        float mult = CurrentBlindType switch { BlindType.Small => 1.0f, BlindType.Big => 1.5f, BlindType.Boss => 2.0f, _ => 1.0f };
+        GameConfig.TargetScore = (int)(300 * CurrentAnte * mult);
+
         HandsLeft = GameConfig.MaxHands;
+        if (CurrentBossDebuff == BossDebuffType.ThePillar) HandsLeft = System.Math.Max(1, HandsLeft - 1);
+
         DiscardsLeft = GameConfig.MaxDiscards;
+        if (CurrentBossDebuff == BossDebuffType.TheWindow) DiscardsLeft = System.Math.Max(0, DiscardsLeft / 2);
 
         ScoringEngine.ActiveJokers.Clear();
         ScoringEngine.ActiveJokers.AddRange(SelectedJokers);
@@ -161,16 +193,34 @@ public class GameManager
         HandsLeft--;
 
         var handResult = HandEvaluator.Evaluate(selectedCards);
-        LastScorePlayed = ScoringEngine.CalculateScore(handResult, out var finalState);
+        LastScorePlayed = ScoringEngine.CalculateScore(handResult, CurrentBossDebuff, out var finalState);
 
         LastHandType = handResult.Type.ToString();
         LastHandResult = handResult;
+        LastHandResult = handResult;
         LastScoreState = finalState;
+
+        // Apply Screen Shake for big hands
+        if (LastScorePlayed > GameConfig.TargetScore * 0.5f) // Big enough to shake
+        {
+            ShakeMagnitude = 15f + (LastScorePlayed / (float)GameConfig.TargetScore) * 5f; // Scales nicely
+            ShakeMagnitude = System.Math.Clamp(ShakeMagnitude, 10f, 40f);
+            ShakeTimer = 0.5f; // Shake for half a second
+        }
 
         // Remove played cards
         foreach (var card in selectedCards)
         {
             PlayerHand.Remove(card);
+        }
+
+        if (CurrentBossDebuff == BossDebuffType.TheHook)
+        {
+            var rnd = System.Random.Shared;
+            for (int i = 0; i < 2 && PlayerHand.Count > 0; i++)
+            {
+                PlayerHand.RemoveAt(rnd.Next(PlayerHand.Count));
+            }
         }
 
         CurrentScore += LastScorePlayed;
@@ -180,17 +230,23 @@ public class GameManager
     public void SortHandByRank()
     {
         CurrentSortMode = SortMode.Rank;
-        var sorted = PlayerHand.OrderByDescending(c => c.Rank).ThenBy(c => c.Suit).ToList();
-        PlayerHand.Clear();
-        PlayerHand.AddRange(sorted);
+        PlayerHand.Sort((a, b) =>
+        {
+            int rankCmp = b.Rank.CompareTo(a.Rank);
+            if (rankCmp != 0) return rankCmp;
+            return a.Suit.CompareTo(b.Suit);
+        });
     }
 
     public void SortHandBySuit()
     {
         CurrentSortMode = SortMode.Suit;
-        var sorted = PlayerHand.OrderBy(c => c.Suit).ThenByDescending(c => c.Rank).ToList();
-        PlayerHand.Clear();
-        PlayerHand.AddRange(sorted);
+        PlayerHand.Sort((a, b) =>
+        {
+            int suitCmp = a.Suit.CompareTo(b.Suit);
+            if (suitCmp != 0) return suitCmp;
+            return b.Rank.CompareTo(a.Rank);
+        });
     }
 
     public void FinishScoreAnimation()
@@ -198,8 +254,15 @@ public class GameManager
         if (CurrentScore >= GameConfig.TargetScore)
         {
             CurrentState = GameState.ShopTransition;
-            Money += 3; // Base win reward
+            Money += CurrentBlindType == BlindType.Boss ? 5 : (CurrentBlindType == BlindType.Big ? 4 : 3); // Base win reward
             Money += HandsLeft; // +1$ per remaining hand
+
+            CurrentBlind++;
+            if (CurrentBlind > 3)
+            {
+                CurrentBlind = 1;
+                CurrentAnte++;
+            }
         }
         else if (HandsLeft <= 0)
         {

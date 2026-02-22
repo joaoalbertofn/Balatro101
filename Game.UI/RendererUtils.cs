@@ -1,6 +1,7 @@
 using Raylib_cs;
 using System.Numerics;
 using Balatro101.Game.Core;
+using Balatro101.Game.Engine;
 
 namespace Balatro101.Game.UI;
 
@@ -9,19 +10,28 @@ public static class RendererUtils
     public const int CardWidth = 130;
     public const int CardHeight = 195;
 
-    public static string? QueuedTooltipTitle { get; set; }
-    public static string? QueuedTooltipDesc { get; set; }
+    public static string? QueuedTooltipTitle;
+    public static string? QueuedTooltipDesc;
+
+    private static string? _cachedTooltipDesc;
+    private static string[] _cachedTooltipWords = Array.Empty<string>();
 
     public static void DrawTooltip()
     {
         if (string.IsNullOrEmpty(QueuedTooltipTitle)) return;
 
-        Vector2 mousePos = Raylib.GetMousePosition();
+        Vector2 mousePos = InputManager.VirtualCursor;
         int width = 200;
         int padding = 10;
 
-        // simple word wrap for description
-        string[] words = QueuedTooltipDesc?.Split(' ') ?? Array.Empty<string>();
+        // Cache Word Wrap arrays to eliminate GC pressure
+        if (QueuedTooltipDesc != _cachedTooltipDesc)
+        {
+            _cachedTooltipDesc = QueuedTooltipDesc;
+            _cachedTooltipWords = QueuedTooltipDesc?.Split(' ') ?? Array.Empty<string>();
+        }
+
+        string[] words = _cachedTooltipWords;
         int fontSizeDesc = 15;
         int maxW = width - padding * 2;
 
@@ -107,18 +117,7 @@ public static class RendererUtils
         float localX = -CardWidth / 2f;
         float localY = -CardHeight / 2f;
 
-        string rankStr = card.Rank switch
-        {
-            Rank.Jack => "J",
-            Rank.Queen => "Q",
-            Rank.King => "K",
-            Rank.Ace => "A",
-            _ => ((int)card.Rank).ToString("00")
-        };
-        string suitStr = card.Suit.ToString().ToLower();
-        string texKey = $"card_{suitStr}_{rankStr}";
-
-        var tex = AssetManager.GetTexture(texKey);
+        var tex = AssetManager.GetTexture(card.TextureKey);
 
         Color borderColor = card.IsSelected ? Color.Blue : Color.Black;
         float thickness = card.IsSelected ? 4f : (tex.HasValue ? 0f : 2f);
@@ -249,10 +248,38 @@ public static class RendererUtils
     {
         float width = 140 * scale;
         float height = 210 * scale;
-        var rect = new Rectangle(x, y, width, height);
+        var baseRect = new Rectangle(x, y, width, height);
+        bool isHovered = Raylib.CheckCollisionPointRec(InputManager.VirtualCursor, baseRect);
 
-        // Drop shadow
-        Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
+        // 1. Scale Tween
+        float animScale = isHovered ? scale * 1.05f : scale;
+        width = 140 * animScale;
+        height = 210 * animScale;
+
+        // 2. Floating Wave
+        float time = (float)Raylib.GetTime();
+        float waveY = MathF.Sin(time * 2f + x * 0.01f) * 5f;
+        y += waveY;
+
+        // 3. Dynamic Shadows
+        float shadowOffsetX = (x - GameConfig.WindowWidth / 2f) * 0.03f;
+        Raylib.DrawRectangleRounded(new Rectangle(x + shadowOffsetX, y + 15, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
+
+        // 4. Fake 3D Rotation on hover
+        float rot = 0f;
+        if (isHovered)
+        {
+            float centerX = x + width / 2;
+            float mouseDistanceX = InputManager.VirtualCursor.X - centerX;
+            rot = mouseDistanceX * 0.05f;
+        }
+
+        Rlgl.PushMatrix();
+        Rlgl.Translatef(x + width / 2, y + height / 2, 0);
+        Rlgl.Rotatef(rot, 0, 0, 1);
+
+        float localX = -width / 2;
+        float localY = -height / 2;
 
         var tex = AssetManager.GetTexture(joker.TextureKey);
 
@@ -261,72 +288,60 @@ public static class RendererUtils
             var sourceRec = new Rectangle(0, 0, tex.Value.Width, tex.Value.Height);
             float targetWidth = width;
             float targetHeight = targetWidth * ((float)tex.Value.Height / tex.Value.Width);
-            var destRec = new Rectangle(x, y, targetWidth, targetHeight);
+            var destRec = new Rectangle(localX, localY, targetWidth, targetHeight);
 
             Raylib.DrawTexturePro(tex.Value, sourceRec, destRec, Vector2.Zero, 0f, Color.White);
 
-            if (isSelected)
-            {
-                Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Green);
-            }
+            if (isSelected) Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Green);
 
-            if (Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), destRec))
+            if (isHovered)
             {
+                Raylib.DrawRectangleLinesEx(destRec, 3f, Color.Yellow);
                 QueuedTooltipTitle = joker.Name;
                 QueuedTooltipDesc = joker.Description;
             }
         }
         else
         {
-            // Card Base
-            Raylib.DrawRectangleRounded(rect, 0.1f, 10, Color.LightGray);
-            Color borderColor = isSelected ? Color.Green : Color.Black;
-            Raylib.DrawRectangleLinesEx(rect, isSelected ? 4f : 2f, borderColor);
+            var localRect = new Rectangle(localX, localY, width, height);
+            Raylib.DrawRectangleRounded(localRect, 0.1f, 10, Color.LightGray);
+            Color borderColor = isSelected ? Color.Green : (isHovered ? Color.Yellow : Color.Black);
+            Raylib.DrawRectangleLinesEx(localRect, isSelected ? 4f : 2f, borderColor);
 
-            // Name
-            int titleFontSize = (int)(16 * scale);
-            // Center name
+            int titleFontSize = (int)(16 * animScale);
             int nameW = Raylib.MeasureText(joker.Name, titleFontSize);
-            Raylib.DrawText(joker.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 15 * scale), titleFontSize, Color.Black);
+            Raylib.DrawText(joker.Name, (int)(localX + width / 2 - nameW / 2), (int)(localY + 15 * animScale), titleFontSize, Color.Black);
 
-            // Logo
-            int logoFontSize = (int)(26 * scale);
+            int logoFontSize = (int)(26 * animScale);
             int logoW = Raylib.MeasureText("JOKER", logoFontSize);
-            Raylib.DrawText("JOKER", (int)(x + width / 2 - logoW / 2), (int)(y + 70 * scale), logoFontSize, Color.DarkBlue);
+            Raylib.DrawText("JOKER", (int)(localX + width / 2 - logoW / 2), (int)(localY + 70 * animScale), logoFontSize, Color.DarkBlue);
 
-            // Description word wrap (smarter)
             string[] words = joker.Description.Split(' ');
-            float currentY = y + 130 * scale;
+            float currentY = localY + 130 * animScale;
             string currentLine = "";
-            int descFontSize = (int)(13 * scale);
-            int maxLineWidth = (int)(width - 20 * scale); // 10 padding each side
+            int descFontSize = (int)(13 * animScale);
+            int maxLineWidth = (int)(width - 20 * animScale);
 
             foreach (var word in words)
             {
                 string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
-                int testWidth = Raylib.MeasureText(testLine, descFontSize);
-
-                if (testWidth < maxLineWidth)
-                {
-                    currentLine = testLine;
-                }
+                if (Raylib.MeasureText(testLine, descFontSize) < maxLineWidth) currentLine = testLine;
                 else
                 {
-                    // Draw current line and move to next
                     int lineW = Raylib.MeasureText(currentLine, descFontSize);
-                    Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
-
+                    Raylib.DrawText(currentLine, (int)(localX + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
                     currentLine = word;
-                    currentY += 16 * scale;
+                    currentY += 16 * animScale;
                 }
             }
-            // Draw remainder
             if (currentLine.Length > 0)
             {
                 int lineW = Raylib.MeasureText(currentLine, descFontSize);
-                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
+                Raylib.DrawText(currentLine, (int)(localX + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.DarkGray);
             }
         }
+
+        Rlgl.PopMatrix();
     }
 
     public static bool DrawButton(string text, float x, float y, float width, float height)
@@ -336,9 +351,12 @@ public static class RendererUtils
 
     public static bool DrawButton(string text, float x, float y, float width, float height, Color baseColor, Color hoverColor)
     {
-        Vector2 mousePos = Raylib.GetMousePosition();
+        Vector2 mousePos = InputManager.VirtualCursor;
         Rectangle rect = new Rectangle(x, y, width, height);
         bool isHovered = Raylib.CheckCollisionPointRec(mousePos, rect);
+
+        // Register Node
+        UINavigator.RegisterNode(new UINode($"btn_{text}_{x}_{y}", rect, UINodeType.Button));
 
         Raylib.DrawRectangleRec(rect, isHovered ? hoverColor : baseColor);
         Raylib.DrawRectangleLinesEx(rect, 2, Color.Black);
@@ -346,7 +364,7 @@ public static class RendererUtils
         int textW = Raylib.MeasureText(text, 20);
         Raylib.DrawText(text, (int)(x + width / 2 - textW / 2), (int)(y + height / 2 - 10), 20, Color.White);
 
-        if (isHovered && Raylib.IsMouseButtonPressed(MouseButton.Left))
+        if (isHovered && InputManager.IsSelectActionPressed())
         {
             return true;
         }
@@ -356,14 +374,38 @@ public static class RendererUtils
 
     public static void DrawConsumable(IConsumable item, float x, float y, bool isHovered, float scale = 1.0f)
     {
+        // 1. Scale Tween
         float animScale = isHovered ? scale * 1.05f : scale;
-        float width = 150 * animScale;
-        float height = 240 * animScale;
+        float width = 140 * animScale;
+        float height = 210 * animScale;
 
-        // Shadow
-        Raylib.DrawRectangleRounded(new Rectangle(x + 5, y + 5, width, height), 0.1f, 10, new Color(0, 0, 0, 100));
+        UINavigator.RegisterNode(new UINode($"item_{item.Name}_{x}_{y}", new Rectangle(x, y, 140 * scale, 210 * scale), UINodeType.Consumable));
 
-        var rect = new Rectangle(x, y, width, height);
+        // 2. Floating Wave
+        float time = (float)Raylib.GetTime();
+        float waveY = MathF.Sin(time * 2f + x * 0.01f) * 5f;
+        y += waveY;
+
+        // 3. Dynamic Shadows
+        float shadowOffsetX = (x - GameConfig.WindowWidth / 2f) * 0.03f;
+        Raylib.DrawRectangleRounded(new Rectangle(x + shadowOffsetX, y + 15, width, height), 0.1f, 10, new Color(0, 0, 0, 80));
+
+        // 4. Fake 3D Rotation on hover
+        float rot = 0f;
+        if (isHovered)
+        {
+            float centerX = x + width / 2;
+            float mouseDistanceX = InputManager.VirtualCursor.X - centerX;
+            rot = mouseDistanceX * 0.05f;
+        }
+
+        Rlgl.PushMatrix();
+        Rlgl.Translatef(x + width / 2, y + height / 2, 0);
+        Rlgl.Rotatef(rot, 0, 0, 1);
+
+        float localX = -width / 2;
+        float localY = -height / 2;
+
         var tex = AssetManager.GetTexture(item.TextureKey);
 
         if (tex.HasValue)
@@ -371,7 +413,7 @@ public static class RendererUtils
             var sourceRec = new Rectangle(0, 0, tex.Value.Width, tex.Value.Height);
             float targetWidth = width;
             float targetHeight = targetWidth * ((float)tex.Value.Height / tex.Value.Width);
-            var destRec = new Rectangle(x, y, targetWidth, targetHeight);
+            var destRec = new Rectangle(localX, localY, targetWidth, targetHeight);
 
             Raylib.DrawTexturePro(tex.Value, sourceRec, destRec, Vector2.Zero, 0f, Color.White);
 
@@ -384,25 +426,23 @@ public static class RendererUtils
         }
         else
         {
+            var localRect = new Rectangle(localX, localY, width, height);
             Color bgColor = item.Type == ConsumableType.Planet ? Color.SkyBlue : Color.Purple;
 
-            Raylib.DrawRectangleRounded(rect, 0.1f, 10, bgColor);
-            Raylib.DrawRectangleLinesEx(rect, 3f, Color.Black);
+            Raylib.DrawRectangleRounded(localRect, 0.1f, 10, bgColor);
+            Raylib.DrawRectangleLinesEx(localRect, 3f, Color.Black);
 
-            // Header Title
             int typeFontSize = (int)(15 * animScale);
             string typeStr = item.Type.ToString().ToUpper();
             int typeW = Raylib.MeasureText(typeStr, typeFontSize);
-            Raylib.DrawText(typeStr, (int)(x + width / 2 - typeW / 2), (int)(y + 10 * animScale), typeFontSize, Color.White);
+            Raylib.DrawText(typeStr, (int)(localX + width / 2 - typeW / 2), (int)(localY + 10 * animScale), typeFontSize, Color.White);
 
-            // Name
             int nameFontSize = (int)(22 * animScale);
             int nameW = Raylib.MeasureText(item.Name, nameFontSize);
-            Raylib.DrawText(item.Name, (int)(x + width / 2 - nameW / 2), (int)(y + 40 * animScale), nameFontSize, Color.Yellow);
+            Raylib.DrawText(item.Name, (int)(localX + width / 2 - nameW / 2), (int)(localY + 40 * animScale), nameFontSize, Color.Yellow);
 
-            // Word wrap description
             string[] words = item.Description.Split(' ');
-            float currentY = y + 100 * animScale;
+            float currentY = localY + 100 * animScale;
             string currentLine = "";
             int descFontSize = (int)(15 * animScale);
             int maxLineWidth = (int)(width - 20 * animScale);
@@ -410,16 +450,11 @@ public static class RendererUtils
             foreach (var word in words)
             {
                 string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
-                int testWidth = Raylib.MeasureText(testLine, descFontSize);
-
-                if (testWidth < maxLineWidth)
-                {
-                    currentLine = testLine;
-                }
+                if (Raylib.MeasureText(testLine, descFontSize) < maxLineWidth) currentLine = testLine;
                 else
                 {
                     int lineW = Raylib.MeasureText(currentLine, descFontSize);
-                    Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
+                    Raylib.DrawText(currentLine, (int)(localX + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
                     currentLine = word;
                     currentY += 20 * animScale;
                 }
@@ -427,8 +462,10 @@ public static class RendererUtils
             if (currentLine.Length > 0)
             {
                 int lineW = Raylib.MeasureText(currentLine, descFontSize);
-                Raylib.DrawText(currentLine, (int)(x + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
+                Raylib.DrawText(currentLine, (int)(localX + width / 2 - lineW / 2), (int)(currentY), descFontSize, Color.White);
             }
         }
+
+        Rlgl.PopMatrix();
     }
 }

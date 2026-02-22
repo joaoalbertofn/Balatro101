@@ -160,7 +160,8 @@ public static class ShopUI
         }
 
         // NEXT BLIND BUTTON
-        if (RendererUtils.DrawButton($"NEXT BLIND (ANTE {game.CurrentAnte})", GameConfig.WindowWidth - 300, GameConfig.WindowHeight - 80, 280, 60))
+        string nextBlindStr = game.CurrentBlind == 3 ? "BOSS BLIND" : (game.CurrentBlind == 2 ? "BIG BLIND" : "SMALL BLIND");
+        if (RendererUtils.DrawButton($"NEXT: {nextBlindStr}", GameConfig.WindowWidth - 300, GameConfig.WindowHeight - 80, 280, 60))
         {
             shopInitialized = false;
             game.StartBlind();

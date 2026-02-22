@@ -2,16 +2,36 @@ using System.Collections.Generic;
 
 namespace Balatro101.Game.Core;
 
-public class Card(Suit suit, Rank rank) : AnimatableItem
+public class Card : AnimatableItem
 {
-    public Suit Suit { get; } = suit;
-    public Rank Rank { get; } = rank;
+    public Suit Suit { get; }
+    public Rank Rank { get; }
+
     // Enhancements (Tarot effects)
     public int BonusChips { get; set; }
     public int BonusMult { get; set; }
     public bool IsFoil { get; set; }
     public bool IsHolographic { get; set; }
     public bool IsPolychrome { get; set; }
+
+    public string TextureKey { get; }
+
+    public Card(Suit suit, Rank rank)
+    {
+        Suit = suit;
+        Rank = rank;
+
+        string rankStr = rank switch
+        {
+            Rank.Jack => "J",
+            Rank.Queen => "Q",
+            Rank.King => "K",
+            Rank.Ace => "A",
+            _ => ((int)rank).ToString("00")
+        };
+        string suitStr = suit.ToString().ToLower();
+        TextureKey = $"card_{suitStr}_{rankStr}";
+    }
 
     public int GetValue() => Rank switch
     {
