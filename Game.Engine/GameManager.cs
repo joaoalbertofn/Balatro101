@@ -81,9 +81,13 @@ public class GameManager
         }
     }
 
+    private float shuffleTimer = 0f;
+
     public void StartBlind()
     {
-        CurrentState = GameState.FaseGameplay;
+        CurrentState = GameState.Shuffling;
+        shuffleTimer = 1.5f; // 1.5 seconds shuffle animation
+
         CurrentScore = 0;
         GameConfig.TargetScore = 300 * CurrentAnte; // Scale Difficulty
         HandsLeft = GameConfig.MaxHands;
@@ -93,8 +97,18 @@ public class GameManager
         ScoringEngine.ActiveJokers.AddRange(SelectedJokers);
 
         Deck.Initialize();
+
         PlayerHand.Clear();
-        DrawCards();
+    }
+
+    public void UpdateShuffling(float dt)
+    {
+        shuffleTimer -= dt;
+        if (shuffleTimer <= 0)
+        {
+            CurrentState = GameState.FaseGameplay;
+            DrawCards();
+        }
     }
 
     public void DrawCards()

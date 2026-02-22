@@ -55,7 +55,36 @@ public static class AssetManager
         {
             if (System.IO.File.Exists(p))
             {
-                Texture2D tex = Raylib.LoadTexture(p);
+                Image img = Raylib.LoadImage(p);
+                int minX = img.Width, minY = img.Height, maxX = 0, maxY = 0;
+                unsafe
+                {
+                    Color* pixels = (Color*)Raylib.LoadImageColors(img);
+                    for (int y = 0; y < img.Height; y++)
+                    {
+                        for (int x = 0; x < img.Width; x++)
+                        {
+                            if (pixels[y * img.Width + x].A > 10)
+                            {
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                        }
+                    }
+                    Raylib.UnloadImageColors(pixels);
+                }
+
+                if (minX <= maxX && minY <= maxY)
+                {
+                    Rectangle cropRec = new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
+                    Raylib.ImageCrop(ref img, cropRec);
+                }
+
+                Texture2D tex = Raylib.LoadTextureFromImage(img);
+                Raylib.UnloadImage(img);
+
                 _textures[key] = tex;
                 return;
             }

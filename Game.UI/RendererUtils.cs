@@ -6,8 +6,82 @@ namespace Balatro101.Game.UI;
 
 public static class RendererUtils
 {
-    public const int CardWidth = 100;
-    public const int CardHeight = 150;
+    public const int CardWidth = 130;
+    public const int CardHeight = 195;
+
+    public static string? QueuedTooltipTitle { get; set; }
+    public static string? QueuedTooltipDesc { get; set; }
+
+    public static void DrawTooltip()
+    {
+        if (string.IsNullOrEmpty(QueuedTooltipTitle)) return;
+
+        Vector2 mousePos = Raylib.GetMousePosition();
+        int width = 200;
+        int padding = 10;
+
+        // simple word wrap for description
+        string[] words = QueuedTooltipDesc?.Split(' ') ?? Array.Empty<string>();
+        int fontSizeDesc = 15;
+        int maxW = width - padding * 2;
+
+        int lines = 1;
+        string currentLine = "";
+        foreach (var w in words)
+        {
+            string test = currentLine.Length == 0 ? w : currentLine + " " + w;
+            if (Raylib.MeasureText(test, fontSizeDesc) < maxW)
+            {
+                currentLine = test;
+            }
+            else
+            {
+                lines++;
+                currentLine = w;
+            }
+        }
+
+        int height = 50 + lines * 20;
+
+        float x = mousePos.X + 15;
+        float y = mousePos.Y + 15;
+
+        // Keep it on screen
+        if (x + width > GameConfig.WindowWidth) x = GameConfig.WindowWidth - width - 5;
+        if (y + height > GameConfig.WindowHeight) y = GameConfig.WindowHeight - height - 5;
+
+        Raylib.DrawRectangleRounded(new Rectangle(x, y, width, height), 0.1f, 10, new Color(30, 30, 35, 255));
+        Raylib.DrawRectangleRoundedLines(new Rectangle(x, y, width, height), 0.1f, 10, Color.Black);
+
+        int titleW = Raylib.MeasureText(QueuedTooltipTitle, 20);
+        Raylib.DrawText(QueuedTooltipTitle, (int)x + (width - titleW) / 2, (int)y + padding, 20, Color.Gold);
+
+        currentLine = "";
+        float currY = y + 40;
+        foreach (var word in words)
+        {
+            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+            if (Raylib.MeasureText(testLine, fontSizeDesc) < maxW)
+            {
+                currentLine = testLine;
+            }
+            else
+            {
+                int lineW = Raylib.MeasureText(currentLine, fontSizeDesc);
+                Raylib.DrawText(currentLine, (int)x + (width - lineW) / 2, (int)currY, fontSizeDesc, Color.White);
+                currentLine = word;
+                currY += 20;
+            }
+        }
+        if (currentLine.Length > 0)
+        {
+            int lineW = Raylib.MeasureText(currentLine, fontSizeDesc);
+            Raylib.DrawText(currentLine, (int)x + (width - lineW) / 2, (int)currY, fontSizeDesc, Color.White);
+        }
+
+        QueuedTooltipTitle = null;
+        QueuedTooltipDesc = null;
+    }
 
     public static void DrawCard(Card card)
     {
@@ -62,6 +136,28 @@ public static class RendererUtils
             if (thickness > 0)
             {
                 Raylib.DrawRectangleLinesEx(destRec, thickness, borderColor);
+            }
+
+            if (card.IsHovered)
+            {
+                QueuedTooltipTitle = $"{card.Rank} de {card.Suit}";
+                QueuedTooltipDesc = $"Fichas (Chips): {card.GetValue() + card.BonusChips}\nMult: {card.BonusMult}";
+                if (card.IsFoil) QueuedTooltipDesc += "\n(Foil)";
+                if (card.IsHolographic) QueuedTooltipDesc += "\n(Holographic)";
+                if (card.IsPolychrome) QueuedTooltipDesc += "\n(Polychrome)";
+            }
+
+            if (card.IsFoil || card.IsHolographic || card.IsPolychrome)
+            {
+                Color fxColor = card.IsPolychrome ? Color.SkyBlue : (card.IsHolographic ? Color.Purple : Color.LightGray);
+                string fxText = card.IsPolychrome ? "POLY" : (card.IsHolographic ? "HOLO" : "FOIL");
+
+                var tagRec = new Rectangle(destRec.X + destRec.Width - 45, destRec.Y - 5, 50, 20);
+                Raylib.DrawRectangleRounded(tagRec, 0.5f, 5, fxColor);
+                Raylib.DrawRectangleRoundedLines(tagRec, 0.5f, 5, Color.Black);
+
+                int textW = Raylib.MeasureText(fxText, 10);
+                Raylib.DrawText(fxText, (int)(tagRec.X + 25 - textW / 2), (int)(tagRec.Y + 5), 10, Color.Black);
             }
         }
         else
@@ -173,6 +269,12 @@ public static class RendererUtils
             {
                 Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Green);
             }
+
+            if (Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), destRec))
+            {
+                QueuedTooltipTitle = joker.Name;
+                QueuedTooltipDesc = joker.Description;
+            }
         }
         else
         {
@@ -276,6 +378,8 @@ public static class RendererUtils
             if (isHovered)
             {
                 Raylib.DrawRectangleLinesEx(destRec, 4f, Color.Yellow);
+                QueuedTooltipTitle = item.Name;
+                QueuedTooltipDesc = item.Description;
             }
         }
         else

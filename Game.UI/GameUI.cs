@@ -10,6 +10,8 @@ public static class GameUI
 {
     public static void UpdateAndDraw(GameManager game)
     {
+        float dt = Raylib.GetFrameTime();
+
         // Smooth card animations
         if (game.CurrentState is GameState.FaseGameplay or GameState.AnimacaoPontuacao)
             UpdateCardsLogic(game);
@@ -25,6 +27,10 @@ public static class GameUI
             case GameState.FaseGameplay:
                 DrawGameplay(game);
                 break;
+            case GameState.Shuffling:
+                game.UpdateShuffling(dt);
+                DrawShuffling(game);
+                break;
             case GameState.AnimacaoPontuacao:
                 DrawScoreAnimation(game);
                 break;
@@ -38,6 +44,8 @@ public static class GameUI
                 DrawGameOver(game);
                 break;
         }
+
+        RendererUtils.DrawTooltip();
 
         Raylib.EndDrawing();
     }
@@ -131,42 +139,14 @@ public static class GameUI
         }
     }
 
+
+
     private static void DrawGameplay(GameManager game)
     {
         DrawLeftPanel(game, false);
         DrawTopRightComponents(game);
 
-        var selectedCards = game.PlayerHand.Where(c => c.IsSelected).ToList();
-        if (selectedCards.Count > 0 && selectedCards.Count <= GameConfig.MaxSelectedCards)
-        {
-            try
-            {
-                var prediction = HandEvaluator.Evaluate(selectedCards);
-                string handName = prediction.Type switch
-                {
-                    HandType.HighCard => "Carta Alta",
-                    HandType.Pair => "Par",
-                    HandType.TwoPair => "Dois Pares",
-                    HandType.ThreeOfAKind => "Trinca",
-                    HandType.Straight => "Sequência",
-                    HandType.Flush => "Flush",
-                    HandType.FullHouse => "Full House",
-                    HandType.FourOfAKind => "Quadra",
-                    HandType.StraightFlush => "Straight Flush",
-                    _ => prediction.Type.ToString()
-                };
-
-                int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, out var tempState);
-
-                int w = Raylib.MeasureText($"{handName}", 30);
-                Raylib.DrawText($"{handName}", 280 + (GameConfig.WindowWidth - 280 - w) / 2, 380, 30, Color.Gold);
-
-                string expectText = $"{tempState.Chips} X {tempState.Multiplier} = {ExpectedScore}";
-                int hw = Raylib.MeasureText(expectText, 20);
-                Raylib.DrawText(expectText, 280 + (GameConfig.WindowWidth - 280 - hw) / 2, 420, 20, Color.LightGray);
-            }
-            catch { }
-        }
+        // Prediction box moved to left panel
 
         foreach (var card in game.PlayerHand)
         {
@@ -209,61 +189,130 @@ public static class GameUI
             game.PlayHand();
     }
 
+    private static void DrawShuffling(GameManager game)
+    {
+        // Background and UI
+        Raylib.DrawRectangle(0, 0, GameConfig.WindowWidth, GameConfig.WindowHeight, new Color(42, 88, 55, 255));
+        DrawLeftPanel(game, false);
+        DrawTopRightComponents(game);
+
+        float t = (float)Raylib.GetTime() * 15f;
+        for (int i = 0; i < 52; i++)
+        {
+            float offsetX = MathF.Sin(t + i) * 6f;
+            float offsetY = MathF.Cos(t + i * 2f) * 4f;
+            float rot = MathF.Sin(t * 0.5f + i) * 3f;
+
+            float x = GameConfig.WindowWidth - 150 + offsetX;
+            float y = GameConfig.WindowHeight - 200 - i * 0.5f + offsetY;
+
+            Rlgl.PushMatrix();
+            Rlgl.Translatef(x, y, 0);
+            Rlgl.Rotatef(rot, 0, 0, 1);
+
+            Raylib.DrawRectangleRounded(new Rectangle(-RendererUtils.CardWidth / 2, -RendererUtils.CardHeight / 2, RendererUtils.CardWidth, RendererUtils.CardHeight), 0.05f, 10, Color.White);
+            Raylib.DrawRectangleRoundedLines(new Rectangle(-RendererUtils.CardWidth / 2, -RendererUtils.CardHeight / 2, RendererUtils.CardWidth, RendererUtils.CardHeight), 0.05f, 10, Color.DarkGray);
+            Raylib.DrawRectangle((int)(-RendererUtils.CardWidth / 2 + 10), (int)(-RendererUtils.CardHeight / 2 + 10), RendererUtils.CardWidth - 20, RendererUtils.CardHeight - 20, new Color(69, 143, 89, 255));
+
+            Rlgl.PopMatrix();
+        }
+    }
+
     public static void DrawLeftPanel(GameManager game, bool isShop)
     {
-        // Dark Side Panel Background
-        Raylib.DrawRectangle(0, 0, 280, GameConfig.WindowHeight, new Color(20, 30, 25, 255));
-        Raylib.DrawLineEx(new Vector2(280, 0), new Vector2(280, GameConfig.WindowHeight), 4, new Color(40, 100, 120, 255));
+        // Base Left Panel
+        Raylib.DrawRectangle(0, 0, 270, GameConfig.WindowHeight, new Color(45, 52, 54, 255));
+        Raylib.DrawRectangle(268, 0, 4, GameConfig.WindowHeight, new Color(41, 128, 185, 255));
 
-        // Blind Info / Shop Header
-        Raylib.DrawRectangle(10, 10, 260, 60, new Color(40, 60, 80, 255));
-        if (isShop)
-        {
-            Raylib.DrawText("LOJA", 100, 25, 30, Color.Gold);
-        }
-        else
-        {
-            Raylib.DrawText("Small Blind", 60, 25, 30, Color.White);
-            Raylib.DrawText($"Meta: {GameConfig.TargetScore}", 20, 80, 20, Color.Red);
-            Raylib.DrawText("Recompensa: $$$", 20, 110, 20, Color.Gold);
-        }
+        // Blind Header (Blue Pill)
+        Raylib.DrawRectangleRounded(new Rectangle(15, 15, 240, 40), 0.5f, 10, new Color(41, 128, 185, 255));
+        string blindName = game.CurrentAnte >= 1 ? "Small Blind" : "Tutorial";
+        int blindW = Raylib.MeasureText(blindName, 22);
+        Raylib.DrawText(blindName, 15 + (240 - blindW) / 2, 25, 22, Color.White);
+
+        // Score at Least (Dark Gray Box)
+        Raylib.DrawRectangleRounded(new Rectangle(15, 65, 240, 60), 0.2f, 10, new Color(30, 30, 30, 255));
+        Raylib.DrawText("Score at least", 80, 75, 15, Color.LightGray);
+        Raylib.DrawText(GameConfig.TargetScore.ToString(), 120, 95, 24, new Color(230, 60, 60, 255));
+        Raylib.DrawText("Reward: $$$", 100, 130, 15, Color.Gold);
 
         // Round Score
-        Raylib.DrawRectangle(10, 150, 260, 50, new Color(50, 50, 50, 255));
-        Raylib.DrawText("Round Score", 20, 165, 20, Color.LightGray);
-        Raylib.DrawText(game.CurrentScore.ToString(), 160, 160, 30, Color.White);
+        Raylib.DrawRectangleRounded(new Rectangle(15, 155, 240, 45), 0.2f, 10, new Color(50, 50, 50, 255));
+        Raylib.DrawText("Round score", 25, 168, 18, Color.LightGray);
+        string cScoreStr = game.CurrentScore.ToString();
+        int cw = Raylib.MeasureText(cScoreStr, 24);
+        Raylib.DrawText(cScoreStr, 245 - cw, 165, 24, Color.White);
 
         if (!isShop)
         {
-            // Run Info (Hands / Discards)
-            Raylib.DrawRectangle(10, 400, 135, 120, new Color(60, 40, 40, 255));
-            Raylib.DrawText("Run Info", 35, 410, 15, Color.LightGray);
+            var selectedCards = game.PlayerHand.Where(c => c.IsSelected).ToList();
+            if (selectedCards.Count > 0 && selectedCards.Count <= GameConfig.MaxSelectedCards)
+            {
+                try
+                {
+                    var prediction = HandEvaluator.Evaluate(selectedCards);
+                    string handName = prediction.Type.ToString(); // Keep simple switch logic
+                    int ExpectedScore = game.ScoringEngine.CalculateScore(prediction, out var tempState);
 
-            Raylib.DrawText($"Hands", 20, 440, 20, Color.SkyBlue);
-            Raylib.DrawText($"{game.HandsLeft}", 105, 440, 20, Color.White);
+                    int predStartY = 215;
+                    Raylib.DrawRectangleRounded(new Rectangle(15, predStartY, 240, 90), 0.2f, 10, new Color(30, 30, 30, 255));
 
-            Raylib.DrawText($"Discards", 15, 480, 20, Color.Orange);
-            Raylib.DrawText($"{game.DiscardsLeft}", 105, 480, 20, Color.White);
+                    int handNameW = Raylib.MeasureText(handName, 20);
+                    Raylib.DrawText(handName, 15 + (240 - handNameW) / 2, predStartY + 10, 20, Color.White);
+
+                    // Chips Pill (Blue)
+                    Raylib.DrawRectangleRounded(new Rectangle(25, predStartY + 40, 95, 35), 0.5f, 10, new Color(41, 128, 185, 255));
+                    string chipsStr = tempState.Chips.ToString();
+                    Raylib.DrawText(chipsStr, 25 + (95 - Raylib.MeasureText(chipsStr, 22)) / 2, predStartY + 48, 22, Color.White);
+
+                    // Mult Pill (Red)
+                    Raylib.DrawRectangleRounded(new Rectangle(150, predStartY + 40, 95, 35), 0.5f, 10, new Color(230, 60, 60, 255));
+                    string multStr = tempState.Multiplier.ToString();
+                    Raylib.DrawText(multStr, 150 + (95 - Raylib.MeasureText(multStr, 22)) / 2, predStartY + 48, 22, Color.White);
+
+                    Raylib.DrawText("X", 128, predStartY + 48, 20, Color.LightGray);
+                }
+                catch { }
+            }
+
+            // Run Info Complex Grouping
+            int infoStartY = 350;
+            // Red Run Info block
+            Raylib.DrawRectangleRounded(new Rectangle(15, infoStartY, 70, 90), 0.2f, 10, new Color(230, 60, 60, 255));
+            Raylib.DrawText("Run", 32, infoStartY + 25, 18, Color.White);
+            Raylib.DrawText("Info", 30, infoStartY + 45, 18, Color.White);
+
+            // Hands Box
+            Raylib.DrawRectangleRounded(new Rectangle(95, infoStartY, 75, 40), 0.2f, 10, new Color(50, 50, 50, 255));
+            Raylib.DrawText("Hands", 110, infoStartY + 5, 15, Color.SkyBlue);
+            Raylib.DrawText(game.HandsLeft.ToString(), 130, infoStartY + 22, 18, Color.White);
+
+            // Discards Box
+            Raylib.DrawRectangleRounded(new Rectangle(180, infoStartY, 75, 40), 0.2f, 10, new Color(50, 50, 50, 255));
+            Raylib.DrawText("Discards", 188, infoStartY + 5, 15, Color.Orange);
+            Raylib.DrawText(game.DiscardsLeft.ToString(), 215, infoStartY + 22, 18, Color.White);
+
+            // Money Box
+            Raylib.DrawRectangleRounded(new Rectangle(95, infoStartY + 50, 160, 40), 0.2f, 10, new Color(50, 50, 50, 255));
+            Raylib.DrawText($"${game.Money}", 150, infoStartY + 60, 24, Color.Gold);
         }
 
-        // Money
-        Raylib.DrawRectangle(155, 400, 115, 60, new Color(40, 40, 40, 255));
-        Raylib.DrawText($"${game.Money}", 170, 415, 30, Color.Gold);
+        // Bottom Pillars
+        int botY = GameConfig.WindowHeight - 80;
 
-        // Options
-        if (RendererUtils.DrawButton("Opções", 10, GameConfig.WindowHeight - 160, 260, 40))
-        {
-            // Pause menu logic here later
-        }
+        // Options Yellow Pill
+        Raylib.DrawRectangleRounded(new Rectangle(15, botY, 90, 60), 0.2f, 10, new Color(241, 169, 59, 255));
+        if (RendererUtils.DrawButton("Opções", 20, botY + 15, 80, 30)) { } // empty for now
 
-        // Ante / Round Info
-        Raylib.DrawRectangle(10, GameConfig.WindowHeight - 100, 125, 60, new Color(30, 30, 30, 255));
-        Raylib.DrawText("Ante", 50, GameConfig.WindowHeight - 95, 15, Color.LightGray);
-        Raylib.DrawText($"{game.CurrentAnte}/8", 50, GameConfig.WindowHeight - 70, 20, Color.Gold);
+        // Ante Box
+        Raylib.DrawRectangleRounded(new Rectangle(115, botY, 65, 60), 0.2f, 10, new Color(30, 30, 30, 255));
+        Raylib.DrawText("Ante", 130, botY + 10, 15, Color.LightGray);
+        Raylib.DrawText($"{game.CurrentAnte}/8", 125, botY + 30, 20, Color.Gold);
 
-        Raylib.DrawRectangle(145, GameConfig.WindowHeight - 100, 125, 60, new Color(30, 30, 30, 255));
-        Raylib.DrawText("Round", 185, GameConfig.WindowHeight - 95, 15, Color.LightGray);
-        Raylib.DrawText($"{game.CurrentBlind}", 195, GameConfig.WindowHeight - 70, 20, Color.Gold);
+        // Round Box
+        Raylib.DrawRectangleRounded(new Rectangle(190, botY, 65, 60), 0.2f, 10, new Color(30, 30, 30, 255));
+        Raylib.DrawText("Round", 200, botY + 10, 15, Color.LightGray);
+        Raylib.DrawText($"{game.CurrentBlind}", 215, botY + 30, 20, Color.White);
     }
 
     private static void DrawTopRightComponents(GameManager game)
@@ -272,27 +321,49 @@ public static class GameUI
         int startX = 300;
         for (int i = 0; i < game.SelectedJokers.Count; i++)
         {
-            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 110, 20, false, 0.75f);
+            RendererUtils.DrawJoker(game.SelectedJokers[i], startX + i * 125, 20, false, 0.85f);
         }
 
         // Consumables in top right
-        int startConsumableX = GameConfig.WindowWidth - 280;
+        int startConsumableX = GameConfig.WindowWidth - 300;
         for (int i = 0; i < game.Consumables.Count; i++)
         {
             var item = game.Consumables[i];
-            float ix = startConsumableX + i * 120;
+            float ix = startConsumableX + i * 125;
             float iy = 20;
 
-            var rect = new Rectangle(ix, iy, 150 * 0.75f, 240 * 0.75f);
+            var rect = new Rectangle(ix, iy, 140 * 0.85f, 210 * 0.85f);
             bool isHovered = Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), rect);
 
-            RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.75f);
+            RendererUtils.DrawConsumable(item, ix, iy, isHovered, 0.85f);
 
             if (RendererUtils.DrawButton("USE", ix + 5, iy + 190, 100, 30))
             {
                 if (item.Type == ConsumableType.Tarot)
                 {
-                    // Action handled here
+                    var selectedCards = game.PlayerHand.Where(c => c.IsSelected).ToList();
+
+                    if (selectedCards.Count > 0)
+                    {
+                        var tarot = (ITarot)item;
+                        foreach (var c in selectedCards)
+                        {
+                            tarot.ApplyToCard(c);
+                            c.IsSelected = false;
+
+                            // Pop animation for visual feedback
+                            c.Scale = 1.6f;
+                            c.TargetScale = 1.0f; // TweenEngine returns it to normal
+                            c.TargetRotation = 0f;
+                            c.Rotation = (float)new Random().NextDouble() * 40f - 20f; // Spin
+                            c.Y -= 50; // Jump up
+                        }
+                    }
+                    else
+                    {
+                        // Can't use Tarot without selecting a card
+                        return;
+                    }
                 }
                 game.Consumables.RemoveAt(i);
                 return;

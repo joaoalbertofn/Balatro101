@@ -12,6 +12,7 @@ class Program
         Raylib.InitWindow(GameConfig.WindowWidth, GameConfig.WindowHeight, "Balatro do J.A.");
         Raylib.SetTargetFPS(GameConfig.FPS);
 
+        AssetManager.LoadAll();
 
         GameManager game = new GameManager();
 

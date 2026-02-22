@@ -8,5 +8,6 @@ public enum GameState
     AnimacaoPontuacao,
     ShopTransition,
     Shop,
+    Shuffling,
     GameOver
 }
